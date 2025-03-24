@@ -183,7 +183,7 @@ import { jwtDecode } from "jwt-decode";
 
 const Profile = () => {
   const navigate = useNavigate();
-  const [user, setUser] = useState({ name: "", email: "", image: "" });
+  const [user, setUser] = useState({ name: "", email: "" });
   const [canvases, setCanvases] = useState([]);
   const [canvasName, setCanvasName] = useState("");
 
@@ -198,9 +198,6 @@ const Profile = () => {
       setUser({
         name: decoded.username || "John Doe",
         email: decoded.email || "johndoe@example.com",
-        image:
-          decoded.image ||
-          "https://connectkaro.org/wp-content/uploads/2019/03/placeholder-profile-male-500x500.png",
       });
       fetchCanvases(decoded.email);
     } catch (error) {
@@ -241,14 +238,12 @@ const Profile = () => {
             body: JSON.stringify(requestBody),
         });
 
-        // Read the response body once and store it
         const data = await response.json();
 
         if (!response.ok) {
             throw new Error(`Failed to create canvas: ${response.status} - ${data.error || data.message || 'Unknown error'}`);
         }
 
-        // If successful, use the already-read data
         setCanvases((prev) => [...prev, data]);
         setCanvasName("");
     } catch (error) {
@@ -304,15 +299,6 @@ const Profile = () => {
       </div>
 
       <div className="w-full max-w-4xl p-6 mt-20 lg:mt-32 bg-white rounded-lg shadow-xl flex items-center gap-6 border border-gray-200">
-        <img
-          className="w-20 h-20 rounded-full border-2 border-yellow-500"
-          src={user.image}
-          alt="User Avatar"
-          onError={(e) => {
-            e.target.src =
-              "https://connectkaro.org/wp-content/uploads/2019/03/placeholder-profile-male-500x500.png";
-          }}
-        />
         <div>
           <h2 className="text-2xl font-semibold text-gray-900">{user.name}</h2>
           <p className="text-gray-600">{user.email}</p>

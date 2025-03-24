@@ -29,62 +29,65 @@ import Toolbox from "../Toolbox";
 import BoardProvider from "../../store/BoardProvider";
 import ToolboxProvider from "../../store/ToolboxProvider";
 import { jwtDecode } from "jwt-decode";
+import { Menu, X } from "lucide-react";
 
 const CanvasPage = () => {
-    const { canvasid } = useParams();
-    const navigate = useNavigate();
-    const [canvasData, setCanvasData] = useState(null);
-    const [userEmail, setUserEmail] = useState("");
-    const [shareEmail, setShareEmail] = useState("");
-    const [loading, setLoading] = useState(true); // Add loading state
+  const { canvasid } = useParams();
+  const navigate = useNavigate();
+  const [canvasData, setCanvasData] = useState(null);
+  const [userEmail, setUserEmail] = useState("");
+  const [shareEmail, setShareEmail] = useState("");
+  const [loading, setLoading] = useState(true); // Add loading state
+  const [isSharePopupOpen, setIsSharePopupOpen] = useState(false);
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
 
-    useEffect(() => {
-        const token = localStorage.getItem("token");
-        if (token) {
-            try {
-                const decoded = jwtDecode(token);
-                setUserEmail(decoded.email);
-            } catch (error) {
-                console.error("Invalid token:", error);
-                navigate("/auth"); // Redirect if token is invalid
-            }
-        } else {
-            navigate("/auth"); // Redirect if no token
-        }
-    }, [navigate]);
+  useEffect(() => {
+    const token = localStorage.getItem("token");
+    if (token) {
+      try {
+        const decoded = jwtDecode(token);
+        setUserEmail(decoded.email);
+      } catch (error) {
+        console.error("Invalid token:", error);
+        navigate("/auth"); // Redirect if token is invalid
+      }
+    } else {
+      navigate("/auth"); // Redirect if no token
+    }
+  }, [navigate]);
 
-    useEffect(() => {
-        if (userEmail) { // Only fetch when userEmail is set
-            fetchCanvas();
-        }
-    }, [userEmail, canvasid]); // Add userEmail as dependency
+  useEffect(() => {
+    if (userEmail) { // Only fetch when userEmail is set
+      fetchCanvas();
+    }
+  }, [userEmail, canvasid]); // Add userEmail as dependency
 
-    const fetchCanvas = async () => {
-        const token = localStorage.getItem("token");
-        setLoading(true);
-        try {
-            const response = await fetch(`http://localhost:3030/canvases/${userEmail}`, {
-                headers: { Authorization: `Bearer ${token}` },
-            });
+  const fetchCanvas = async () => {
+    const token = localStorage.getItem("token");
+    setLoading(true);
+    try {
+      const response = await fetch(`http://localhost:3030/canvases/${userEmail}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
 
-            if (!response.ok) {
-                const errorText = await response.text();
-                throw new Error(`Failed to fetch canvases: ${response.status} - ${errorText}`);
-            }
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Failed to fetch canvases: ${response.status} - ${errorText}`);
+      }
 
-            const data = await response.json();
-            const canvas = data.find(c => c._id === canvasid);
-            if (canvas) {
-                setCanvasData(canvas);
-            } else {
-                console.warn(`Canvas with ID ${canvasid} not found`);
-            }
-        } catch (error) {
-            console.error("Error fetching canvas:", error);
-        } finally {
-            setLoading(false);
-        }
-    };
+      const data = await response.json();
+      const canvas = data.find(c => c._id === canvasid);
+      if (canvas) {
+        setCanvasData(canvas);
+      } else {
+        console.warn(`Canvas with ID ${canvasid} not found`);
+      }
+    } catch (error) {
+      console.error("Error fetching canvas:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleUpdate = async (elements) => {
     const token = localStorage.getItem("token");
@@ -118,68 +121,88 @@ const CanvasPage = () => {
       });
       if (!response.ok) throw new Error("Failed to share canvas");
       setShareEmail("");
-      fetchCanvas(); // Refresh canvas data
+      setIsSharePopupOpen(false);
+      fetchCanvas();
     } catch (error) {
       console.error("Error sharing canvas:", error);
-    }
-  };
-
-  const handleDelete = async () => {
-    const token = localStorage.getItem("token");
-    try {
-      const response = await fetch(`http://localhost:3030/canvases/${canvasid}`, {
-        method: "DELETE",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ email: userEmail }),
-      });
-      if (!response.ok) throw new Error("Failed to delete canvas");
-      navigate("/profile");
-    } catch (error) {
-      console.error("Error deleting canvas:", error);
     }
   };
 
   return (
     <BoardProvider>
         <ToolboxProvider>
-            <div className="relative min-h-screen">
+            <div className="relative min-h-screen bg-gray-100">
                 <Toolbar />
-                {loading ? (
-                    <div>Loading...</div>
-                ) : canvasData ? (
-                    <>
-                        <div className="absolute top-4 right-4 z-10 flex gap-2">
+                {/* Hamburger Menu */}
+                <div className="absolute top-4 left-4 z-20">
+                    <button 
+                        onClick={() => setIsMenuOpen(!isMenuOpen)}
+                        className="p-2 bg-white rounded-full shadow-md"
+                    >
+                        {isMenuOpen ? <X size={24} /> : <Menu size={24} />}
+                    </button>
+                    {isMenuOpen && canvasData && (
+                        <div className="absolute top-12 left-0 w-64 bg-white rounded-lg shadow-xl p-4">
+                            <h3 className="font-semibold text-gray-800 mb-2">Shared With:</h3>
+                            <ul className="text-sm text-gray-600">
+                                {canvasData.canvasSharedWith.length > 0 ? (
+                                    canvasData.canvasSharedWith.map((email, index) => (
+                                        <li key={index} className="py-1">{email}</li>
+                                    ))
+                                ) : (
+                                    <li>Not shared with anyone</li>
+                                )}
+                            </ul>
+                        </div>
+                    )}
+                </div>
+
+                {/* Share Button and Popup */}
+                <div className="absolute top-4 right-4 z-10">
+                    <button
+                        onClick={() => setIsSharePopupOpen(true)}
+                        className="bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 transition"
+                    >
+                        Share
+                    </button>
+                    {isSharePopupOpen && (
+                        <div className="absolute right-0 mt-2 w-80 bg-white rounded-lg shadow-xl p-4">
+                            <div className="flex justify-between items-center mb-4">
+                                <h3 className="text-lg font-semibold text-gray-800">Share Canvas</h3>
+                                <button 
+                                    onClick={() => setIsSharePopupOpen(false)}
+                                    className="text-gray-500 hover:text-gray-700"
+                                >
+                                    <X size={20} />
+                                </button>
+                            </div>
                             <input
                                 type="email"
                                 value={shareEmail}
                                 onChange={(e) => setShareEmail(e.target.value)}
-                                placeholder="Share with email"
-                                className="p-2 border rounded"
+                                placeholder="Enter email to share with"
+                                className="w-full p-2 border rounded-md mb-4 focus:outline-none focus:ring-2 focus:ring-blue-500"
                             />
                             <button
                                 onClick={handleShare}
-                                className="bg-blue-500 text-white px-4 py-2 rounded"
+                                className="w-full bg-blue-500 text-white py-2 rounded-md hover:bg-blue-600 transition"
                             >
-                                Share
-                            </button>
-                            <button
-                                onClick={handleDelete}
-                                className="bg-red-500 text-white px-4 py-2 rounded"
-                            >
-                                Delete
+                                Send Invite
                             </button>
                         </div>
-                        <Board 
-                            canvasId={canvasid} 
-                            initialElements={canvasData?.canvasElements || []}
-                            onUpdate={handleUpdate}
-                        />
-                    </>
+                    )}
+                </div>
+
+                {loading ? (
+                    <div className="flex items-center justify-center h-screen">Loading...</div>
+                ) : canvasData ? (
+                    <Board 
+                        canvasId={canvasid} 
+                        initialElements={canvasData?.canvasElements || []}
+                        onUpdate={handleUpdate}
+                    />
                 ) : (
-                    <div>Canvas not found</div>
+                    <div className="flex items-center justify-center h-screen">Canvas not found</div>
                 )}
                 <Toolbox />
             </div>
