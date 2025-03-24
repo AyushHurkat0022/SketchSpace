@@ -1,0 +1,41 @@
+# Node.js / General
+node_modules/
+*.log
+npm-debug.log
+yarn-error.log
+.env
+dist/
+build/
+
+# MongoDB
+*.mongodb
+
+# React
+.DS_Store
+**/.DS_Store
+
+# Editor directories and files
+.idea/
+.vscode/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.swp
+
+# OS generated files
+Thumbs.db
+ehthumbs.db
+
+# Testing
+coverage/
+*.lcov
+
+# Production
+*.min.js
+*.min.css
+
+# Misc
+*.seed
+*.pid
+*.pid.lock
