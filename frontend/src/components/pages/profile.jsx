@@ -1,182 +1,3 @@
-// import React, { useEffect, useState } from "react";
-// import { useNavigate } from "react-router-dom";
-// import { jwtDecode } from "jwt-decode";
-
-// const Profile = () => {
-//   const navigate = useNavigate();
-//   const [user, setUser] = useState({ name: "", email: "", image: "" });
-//   const [canvases, setCanvases] = useState([]);
-//   const [canvasName, setCanvasName] = useState("");
-
-//   useEffect(() => {
-//     const token = localStorage.getItem("token");
-//     if (token) {
-//       try {
-//         const decoded = jwtDecode(token);
-//         setUser({
-//           name: decoded.name || decoded.username || "John Doe",
-//           email: decoded.email || "johndoe@example.com",
-//           image:
-//             decoded.image ||
-//             "https://connectkaro.org/wp-content/uploads/2019/03/placeholder-profile-male-500x500.png",
-//         });
-//       } catch (error) {
-//         console.error("Invalid token", error);
-//       }
-//     }
-//     fetchCanvases();
-//   }, []);
-
-//   const fetchCanvases = async () => {
-//     const token = localStorage.getItem("token");
-//     if (!token) return;
-
-//     try {
-//       const decoded = jwtDecode(token);
-//       const email = decoded.email;
-
-//       const response = await fetch(`http://localhost:3030/canvases/${email}`, {
-//         headers: { Authorization: `Bearer ${token}` },
-//       });
-
-//       if (!response.ok) throw new Error("Failed to fetch canvases");
-//       const data = await response.json();
-//       setCanvases(data);
-//     } catch (error) {
-//       console.error("Error fetching canvases:", error);
-//     }
-//   };
-
-//   const handleCreateCanvas = async () => {
-//     console.log("Create Canvas Button Clicked!");
-  
-//     const token = localStorage.getItem("token");
-//     if (!token) {
-//       console.error("No token found");
-//       return;
-//     }
-  
-//     const requestBody = {
-//       email: user.email,  // Fix key name from 'createdBy' to 'email'
-//       canvasElements: [], // Default empty array
-//       canvasSharedWith: [], // Default empty array
-//     };
-  
-//     console.log("Request Body:", JSON.stringify(requestBody));
-  
-//     try {
-//       const response = await fetch("http://localhost:3030/canvases", {
-//         method: "POST",
-//         headers: {
-//           "Content-Type": "application/json",
-//           Authorization: `Bearer ${token}`, // Ensure the correct token is used
-//         },
-//         body: JSON.stringify(requestBody),
-//       });
-  
-//       console.log("Response Status:", response.status);
-  
-//       if (!response.ok) {
-//         const errorMessage = await response.text();
-//         throw new Error(`Failed to create canvas: ${errorMessage}`);
-//       }
-  
-//       const newCanvas = await response.json();
-//       console.log("Canvas Created:", newCanvas);
-  
-//       setCanvases((prevCanvases) => [...prevCanvases, newCanvas]);
-//     } catch (error) {
-//       console.error("Error creating canvas:", error);
-//     }
-//   };
-
-//   const handleCanvasClick = (canvasId) => {
-//     if (!canvasId) {
-//       console.error("Canvas ID is undefined!");
-//       return;
-//     }
-//     navigate(`/canvas/${canvasId}`);
-//   };
-
-//   return (
-//     <div className="min-h-screen p-8 flex flex-col items-center bg-starry relative">
-//       <div className="absolute top-0 left-0 right-0 p-8 text-left z-20">
-//         <h1 className="text-yellow-600 text-4xl font-bold mb-2 lg:text-5xl">
-//           SketchSpace
-//         </h1>
-//         <p className="text-green-600 italic mb-6 lg:text-xl">
-//           Draw Your Vision, Share Your Story.
-//         </p>
-//       </div>
-
-//       <div className="absolute top-8 right-8 flex gap-4">
-//         <button
-//           className="bg-yellow-500 text-white px-6 py-2 rounded-lg shadow-md hover:bg-yellow-600 transition-all cursor-pointer"
-//           onClick={() => navigate("/auth")}
-//         >
-//           Logout
-//         </button>
-//       </div>
-
-//       <div className="w-full max-w-4xl p-6 mt-20 lg:mt-32 bg-white rounded-lg shadow-xl flex items-center gap-6 border border-gray-200">
-//         <img
-//           className="w-20 h-20 rounded-full border-2 border-yellow-500"
-//           src={user.image}
-//           alt="User Avatar"
-//           onError={(e) => {
-//             e.target.onerror = null;
-//             e.target.src =
-//               "https://connectkaro.org/wp-content/uploads/2019/03/placeholder-profile-male-500x500.png";
-//           }}
-//         />
-//         <div>
-//           <h2 className="text-2xl font-semibold text-gray-900">{user.name}</h2>
-//           <p className="text-gray-600">{user.email}</p>
-//         </div>
-//       </div>
-
-//       <div className="w-full max-w-4xl mt-8">
-//         <h3 className="text-lg font-bold text-gray-900 mb-4">Create a New Canvas</h3>
-//         <div className="flex gap-4">
-//           <input
-//             type="text"
-//             className="p-2 border rounded-md w-full"
-//             placeholder="Enter Canvas Name"
-//             value={canvasName}
-//             onChange={(e) => setCanvasName(e.target.value)}
-//           />
-//           <button
-//             className="px-4 py-2 bg-green-500 text-white rounded-md cursor-pointer"
-//             onClick={handleCreateCanvas}
-//           >
-//             Create
-//           </button>
-//         </div>
-//       </div>
-
-//       <div className="w-full max-w-4xl mt-8">
-//       <h3 className="text-lg font-bold text-gray-900 mb-4">Your Canvases</h3>
-//       <div className="grid grid-cols-2 gap-6">
-//         {canvases.length > 0 ? (
-//           canvases.map((canvas, index) => (
-//             <div
-//               key={index}
-//               onClick={() => handleCanvasClick(canvas._id)}
-//               className="p-6 border border-yellow-500 hover:bg-yellow-100 transition text-center rounded-lg shadow-md font-medium cursor-pointer"
-//             >
-//               {canvas.name || `${user.name}'s Canvas ${index + 1}`}
-//             </div>
-//           ))
-//         ) : (
-//           <p className="text-gray-600">No canvases found</p>
-//         )}
-//       </div>
-//     </div>
-//     </div>
-//   );
-// };
-
-// export default Profile;
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { jwtDecode } from "jwt-decode";
@@ -186,6 +7,8 @@ const Profile = () => {
   const [user, setUser] = useState({ name: "", email: "" });
   const [canvases, setCanvases] = useState([]);
   const [canvasName, setCanvasName] = useState("");
+  const [error, setError] = useState("");
+  const [sharedEmails, setSharedEmails] = useState(null); // State to track which canvas's shared emails to show
 
   useEffect(() => {
     const token = localStorage.getItem("token");
@@ -221,35 +44,45 @@ const Profile = () => {
   };
 
   const handleCreateCanvas = async () => {
+    if (!canvasName.trim()) {
+      setError("Canvas name is required");
+      return;
+    }
+
+    setError("");
     const token = localStorage.getItem("token");
     try {
-        const requestBody = {
-            email: user.email,
-            canvasElements: [],
-            canvasSharedWith: [],
-            name: canvasName || undefined,
-        };
-        const response = await fetch("http://localhost:3030/canvases", {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json",
-                Authorization: `Bearer ${token}`,
-            },
-            body: JSON.stringify(requestBody),
-        });
+      const requestBody = {
+        email: user.email,
+        canvasElements: [],
+        canvasSharedWith: [],
+        name: canvasName,
+      };
+      const response = await fetch("http://localhost:3030/canvases", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(requestBody),
+      });
 
-        const data = await response.json();
+      const data = await response.json();
 
-        if (!response.ok) {
-            throw new Error(`Failed to create canvas: ${response.status} - ${data.error || data.message || 'Unknown error'}`);
-        }
+      if (!response.ok) {
+        throw new Error(
+          `Failed to create canvas: ${response.status} - ${
+            data.error || data.message || "Unknown error"
+          }`
+        );
+      }
 
-        setCanvases((prev) => [...prev, data]);
-        setCanvasName("");
+      setCanvases((prev) => [...prev, data]);
+      setCanvasName("");
     } catch (error) {
-        console.error("Error creating canvas:", error);
+      console.error("Error creating canvas:", error);
     }
-};
+  };
 
   const handleCanvasClick = (canvasId) => {
     navigate(`/canvas/${canvasId}`);
@@ -267,9 +100,22 @@ const Profile = () => {
         body: JSON.stringify({ email: user.email }),
       });
       if (!response.ok) throw new Error("Failed to delete canvas");
-      setCanvases((prev) => prev.filter(canvas => canvas._id !== canvasId));
+      setCanvases((prev) => prev.filter((canvas) => canvas._id !== canvasId));
     } catch (error) {
       console.error("Error deleting canvas:", error);
+    }
+  };
+
+  const handleShareCanvas = (canvasId) => {
+    console.log(`Sharing canvas with ID: ${canvasId}`);
+  };
+
+  const handleShowSharedWith = (canvasId, sharedWith) => {
+    // Toggle shared emails display
+    if (sharedEmails === canvasId) {
+      setSharedEmails(null); // Hide if already showing
+    } else {
+      setSharedEmails(canvasId); // Show for this canvas
     }
   };
 
@@ -279,80 +125,112 @@ const Profile = () => {
   };
 
   return (
-    <div className="min-h-screen p-8 flex flex-col items-center bg-starry relative">
-      <div className="absolute top-0 left-0 right-0 p-8 text-left z-20">
-        <h1 className="text-yellow-600 text-4xl font-bold mb-2 lg:text-5xl">
-          SketchSpace
-        </h1>
-        <p className="text-green-600 italic mb-6 lg:text-xl">
-          Draw Your Vision, Share Your Story.
-        </p>
-      </div>
-
-      <div className="absolute top-8 right-8 flex gap-4">
-        <button
-          className="bg-yellow-500 text-white px-6 py-2 rounded-lg shadow-md hover:bg-yellow-600 transition-all cursor-pointer"
-          onClick={handleLogout}
-        >
-          Logout
-        </button>
-      </div>
-
-      <div className="w-full max-w-4xl p-6 mt-20 lg:mt-32 bg-white rounded-lg shadow-xl flex items-center gap-6 border border-gray-200">
-        <div>
-          <h2 className="text-2xl font-semibold text-gray-900">{user.name}</h2>
-          <p className="text-gray-600">{user.email}</p>
-        </div>
-      </div>
-
-      <div className="w-full max-w-4xl mt-8">
-        <h3 className="text-lg font-bold text-gray-900 mb-4">Create a New Canvas</h3>
-        <div className="flex gap-4">
-          <input
-            type="text"
-            className="p-2 border rounded-md w-full"
-            placeholder="Enter Canvas Name"
-            value={canvasName}
-            onChange={(e) => setCanvasName(e.target.value)}
-          />
+    <div className="min-h-screen p-8 flex flex-col bg-gray-100">
+      <div className="w-full max-w-5xl mx-auto">
+        <div className="flex justify-between items-center mb-8">
+          <div>
+            <h1 className="text-yellow-600 text-4xl font-bold mb-2 lg:text-5xl">
+              SketchSpace
+            </h1>
+            <p className="text-green-600 italic mb-6 lg:text-xl">
+              Draw Your Vision, Share Your Story.
+            </p>
+          </div>
           <button
-            className="px-4 py-2 bg-green-500 text-white rounded-md cursor-pointer"
-            onClick={handleCreateCanvas}
+            className="bg-yellow-500 text-white px-6 py-2 rounded-lg shadow-md hover:bg-yellow-600 transition-all cursor-pointer"
+            onClick={handleLogout}
           >
-            Create
+            Logout
           </button>
         </div>
-      </div>
 
-      <div className="w-full max-w-4xl mt-8">
-        <h3 className="text-lg font-bold text-gray-900 mb-4">Your Canvases</h3>
-        <div className="grid grid-cols-2 gap-6">
-          {canvases.length > 0 ? (
-            canvases.map((canvas) => (
-              <div
-                key={canvas._id}
-                className="p-6 border border-yellow-500 rounded-lg shadow-md"
+        <div className="mb-8">
+          <h2 className="text-3xl font-bold text-yellow-600">
+            Welcome Back, {user.name}! 👋
+          </h2>
+          <p className="text-gray-600 mt-2">Manage and create your canvas projects</p>
+        </div>
+
+        <div className="mb-8">
+          <div className="flex flex-col gap-2">
+            {error && <p className="text-red-500 text-sm">{error}</p>}
+            <div className="flex items-center gap-4">
+              <input
+                type="text"
+                className={`p-3 border ${
+                  error ? "border-red-500" : "border-gray-300"
+                } rounded-lg w-full focus:outline-none focus:ring-2 focus:ring-blue-500`}
+                placeholder="Enter canvas name"
+                value={canvasName}
+                onChange={(e) => {
+                  setCanvasName(e.target.value);
+                  if (e.target.value.trim()) setError("");
+                }}
+              />
+              <button
+                className="px-4 py-3 bg-yellow-600 text-white rounded-lg flex items-center gap-2 hover:bg-blue-700 transition-all"
+                onClick={handleCreateCanvas}
               >
+                <span className="text-lg">+</span> Create New Canvas
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <h3 className="text-xl font-bold text-yellow-600 mb-4">Your Canvases</h3>
+          {canvases.length > 0 ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+              {canvases.map((canvas) => (
                 <div
-                  onClick={() => handleCanvasClick(canvas._id)}
-                  className="hover:bg-yellow-100 transition text-center font-medium cursor-pointer mb-2"
+                  key={canvas._id}
+                  className="p-4 bg-white rounded-lg shadow-md border border-gray-200"
                 >
-                  {canvas.name || `${user.name}'s Canvas`}
+                  <div
+                    onClick={() => handleCanvasClick(canvas._id)}
+                    className="flex items-center justify-center h-24 bg-gray-100 rounded-lg mb-4 cursor-pointer hover:bg-gray-200 transition-all"
+                  >
+                    <span className="text-2xl">🎨</span>
+                  </div>
+                  <h4 className="text-lg font-medium text-gray-800 text-center">
+                    {canvas.name || `${user.name}'s Canvas`}
+                  </h4>
+                  <div className="text-sm text-gray-600 mt-2">
+                    Created by: {canvas.email === user.email ? user.name : canvas.email}
+                  </div>
+                  <div className="text-sm text-gray-600">
+                    Last updated by: {canvas.lastUpdatedBy || canvas.email === user.email ? user.name : canvas.email}
+                  </div>
+                  {sharedEmails === canvas._id && (
+                    <div className="text-sm text-gray-600 mt-2">
+                      Shared with: {canvas.canvasSharedWith.length > 0 
+                        ? canvas.canvasSharedWith.join(", ") 
+                        : "None"}
+                    </div>
+                  )}
+                  <div className="flex justify-between mt-4 gap-2">
+                    <button
+                      onClick={() => handleShareCanvas(canvas._id)}
+                      className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-all"
+                    >
+                      Share
+                    </button>
+                    <button
+                      onClick={() => handleShowSharedWith(canvas._id, canvas.canvasSharedWith)}
+                      className="px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-all"
+                    >
+                      Shared With
+                    </button>
+                    <button
+                      onClick={() => handleDeleteCanvas(canvas._id, canvas.email === user.email)}
+                      className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-all"
+                    >
+                      {canvas.email === user.email ? "Delete" : "Remove"}
+                    </button>
+                  </div>
                 </div>
-                <div className="text-sm text-gray-600">
-                  Last updated by: {canvas.lastUpdatedBy || "Unknown"}
-                </div>
-                <div className="text-sm text-gray-600">
-                  Shared with: {canvas.canvasSharedWith.join(", ") || "None"}
-                </div>
-                <button
-                  onClick={() => handleDeleteCanvas(canvas._id, canvas.email === user.email)}
-                  className="mt-2 bg-red-500 text-white px-2 py-1 rounded text-sm"
-                >
-                  {canvas.email === user.email ? "Delete" : "Remove"}
-                </button>
-              </div>
-            ))
+              ))}
+            </div>
           ) : (
             <p className="text-gray-600">No canvases found</p>
           )}
