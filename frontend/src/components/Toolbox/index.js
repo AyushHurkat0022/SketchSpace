@@ -1,7 +1,5 @@
-import React, { useContext } from "react";
-
+import React, { useContext, useState } from "react";
 import cx from "classnames";
-
 import classes from "./index.module.css";
 import {
   COLORS,
@@ -17,13 +15,40 @@ const Toolbox = () => {
   const { activeToolItem } = useContext(boardContext);
   const { toolboxState, changeStroke, changeFill, changeSize } =
     useContext(toolboxContext);
+  const [isMinimized, setIsMinimized] = useState(false);
 
   const strokeColor = toolboxState[activeToolItem]?.stroke;
   const fillColor = toolboxState[activeToolItem]?.fill;
   const size = toolboxState[activeToolItem]?.size;
 
+  const toggleMinimize = () => {
+    setIsMinimized(!isMinimized);
+  };
+
+  if (isMinimized) {
+    return (
+      <button 
+        className={classes.paletteButton} 
+        onClick={toggleMinimize}
+        aria-label="Open toolbox"
+      >
+        🎨
+      </button>
+    );
+  }
+
   return (
     <div className={classes.container}>
+      <div className={classes.toolboxHeader}>
+        <button
+          className={classes.minimizeButton}
+          onClick={toggleMinimize}
+          aria-label="Minimize toolbox"
+        >
+          —
+        </button>
+      </div>
+      
       {STROKE_TOOL_TYPES.includes(activeToolItem) && (
         <div className={classes.selectOptionContainer}>
           <div className={classes.toolBoxLabel}>Stroke Color</div>
