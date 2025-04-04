@@ -24,11 +24,13 @@ const Toolbar = () => {
 
   const handleDownloadClick = () => {
     const canvas = document.getElementById("canvas");
-    const data = canvas.toDataURL("image/png");
-    const anchor = document.createElement("a");
-    anchor.href = data;
-    anchor.download = "board.png";
-    anchor.click();
+    if (canvas) {
+      const data = canvas.toDataURL("image/png");
+      const anchor = document.createElement("a");
+      anchor.href = data;
+      anchor.download = "board.png";
+      anchor.click();
+    }
   };
 
   const handleColab = () => {
@@ -38,37 +40,65 @@ const Toolbar = () => {
   return (
     <>
       <div className={classes.container}>
-        <div className={cx(classes.toolItem, { [classes.active]: activeToolItem === TOOL_ITEMS.BRUSH })} onClick={() => changeToolHandler(TOOL_ITEMS.BRUSH)}>
+        <div 
+          className={cx(classes.toolItem, { [classes.active]: activeToolItem === TOOL_ITEMS.BRUSH })} 
+          onClick={() => changeToolHandler(TOOL_ITEMS.BRUSH)}
+          title="Brush"
+        >
           <FaPaintBrush />
         </div>
-        <div className={cx(classes.toolItem, { [classes.active]: activeToolItem === TOOL_ITEMS.LINE })} onClick={() => changeToolHandler(TOOL_ITEMS.LINE)}>
+        <div 
+          className={cx(classes.toolItem, { [classes.active]: activeToolItem === TOOL_ITEMS.LINE })} 
+          onClick={() => changeToolHandler(TOOL_ITEMS.LINE)}
+          title="Line"
+        >
           <FaSlash />
         </div>
-        <div className={cx(classes.toolItem, { [classes.active]: activeToolItem === TOOL_ITEMS.RECTANGLE })} onClick={() => changeToolHandler(TOOL_ITEMS.RECTANGLE)}>
+        <div 
+          className={cx(classes.toolItem, { [classes.active]: activeToolItem === TOOL_ITEMS.RECTANGLE })} 
+          onClick={() => changeToolHandler(TOOL_ITEMS.RECTANGLE)}
+          title="Rectangle"
+        >
           <LuRectangleHorizontal />
         </div>
-        <div className={cx(classes.toolItem, { [classes.active]: activeToolItem === TOOL_ITEMS.CIRCLE })} onClick={() => changeToolHandler(TOOL_ITEMS.CIRCLE)}>
+        <div 
+          className={cx(classes.toolItem, { [classes.active]: activeToolItem === TOOL_ITEMS.CIRCLE })} 
+          onClick={() => changeToolHandler(TOOL_ITEMS.CIRCLE)}
+          title="Circle"
+        >
           <FaRegCircle />
         </div>
-        <div className={cx(classes.toolItem, { [classes.active]: activeToolItem === TOOL_ITEMS.ARROW })} onClick={() => changeToolHandler(TOOL_ITEMS.ARROW)}>
+        <div 
+          className={cx(classes.toolItem, { [classes.active]: activeToolItem === TOOL_ITEMS.ARROW })} 
+          onClick={() => changeToolHandler(TOOL_ITEMS.ARROW)}
+          title="Arrow"
+        >
           <FaArrowRight />
         </div>
-        <div className={cx(classes.toolItem, { [classes.active]: activeToolItem === TOOL_ITEMS.ERASER })} onClick={() => changeToolHandler(TOOL_ITEMS.ERASER)}>
+        <div 
+          className={cx(classes.toolItem, { [classes.active]: activeToolItem === TOOL_ITEMS.ERASER })} 
+          onClick={() => changeToolHandler(TOOL_ITEMS.ERASER)}
+          title="Eraser"
+        >
           <FaEraser />
         </div>
-        <div className={cx(classes.toolItem, { [classes.active]: activeToolItem === TOOL_ITEMS.TEXT })} onClick={() => changeToolHandler(TOOL_ITEMS.TEXT)}>
+        <div 
+          className={cx(classes.toolItem, { [classes.active]: activeToolItem === TOOL_ITEMS.TEXT })} 
+          onClick={() => changeToolHandler(TOOL_ITEMS.TEXT)}
+          title="Text"
+        >
           <FaFont />
         </div>
-        <div className={classes.toolItem} onClick={undo}>
+        <div className={classes.toolItem} onClick={undo} title="Undo">
           <FaUndoAlt />
         </div>
-        <div className={classes.toolItem} onClick={redo}>
+        <div className={classes.toolItem} onClick={redo} title="Redo">
           <FaRedoAlt />
         </div>
-        <div className={classes.toolItem} onClick={handleDownloadClick}>
+        <div className={classes.toolItem} onClick={handleDownloadClick} title="Download">
           <FaDownload />
         </div>
-        <div className={classes.toolItem} onClick={handleColab}>
+        <div className={classes.toolItem} onClick={handleColab} title="Collaborate">
           <FaHandshake />
         </div>
       </div>

@@ -1,17 +1,90 @@
+/* index.module.css */
+
+/* Color scheme variables inspired by whiteboard standards */
+:root {
+  --primary-bg: #ffffff;          /* White background */
+  --primary-shadow: rgba(0, 0, 0, 0.15); /* Subtle shadow */
+  --hover-bg: #e6e6e6;           /* Light gray hover */
+  --active-bg: #0078d4;          /* Blue for active state */
+  --active-color: #ffffff;       /* White icons in active state */
+  --icon-color: #1a1a1a;         /* Near-black for icons */
+  --tooltip-bg: #333333;         /* Dark gray tooltip background */
+  --tooltip-color: #ffffff;      /* White tooltip text */
+  --hover-transition: all 0.2s ease;
+}
+
 .container {
-  @apply absolute left-1/2 top-5 px-3 py-2 flex rounded border border-gray-400;
+  position: fixed;
+  top: 20px;
+  left: 50%;
   transform: translateX(-50%);
-  box-shadow: 1px 0 10px rgba(0, 0, 0, 0.2);
+  display: flex;
+  gap: 10px;
+  padding: 10px;
+  background: var(--primary-bg);
+  border-radius: 50px;
+  box-shadow: 0 4px 12px var(--primary-shadow);
+  z-index: 10;
+  flex-wrap: wrap;
+  justify-content: center;
+  width: auto;
+  max-width: 100%;
+}
+
+/* For screens smaller than 768px */
+@media (max-width: 768px) {
+  .container {
+    width: 60%;
+    border-radius: 20px;
+    padding: 8px;
+    gap: 8px;
+  }
 }
 
 .toolItem {
-  @apply flex justify-center items-center text-xl p-3 text-black mr-5 last:mr-0 cursor-pointer;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  cursor: pointer;
+  transition: var(--hover-transition);
+  color: var(--icon-color);
+  position: relative; /* Needed for tooltip positioning */
 }
 
 .toolItem:hover {
-  @apply bg-blue-50 text-gray-700 rounded;
+  background: var(--hover-bg);
 }
 
-.toolItem.active {
-  @apply bg-blue-200 text-gray-700 rounded;
+.toolItem svg {
+  width: 20px;
+  height: 20px;
+}
+
+/* Tooltip styling */
+.toolItem:hover::after {
+  content: attr(title); /* Uses the title attribute for content */
+  position: absolute;
+  top: -30px; /* Position above the tool */
+  right: -10px; /* Slightly to the right */
+  background: var(--tooltip-bg);
+  color: var(--tooltip-color);
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  white-space: nowrap;
+  z-index: 20;
+  pointer-events: none; /* Prevents tooltip from interfering with hover */
+}
+
+.active {
+  background: var(--active-bg);
+  color: var(--active-color);
+}
+
+.active:hover {
+  background: var(--active-bg);
+  opacity: 0.9;
 }
