@@ -1,6 +1,5 @@
 import { ARROW_LENGTH, TOOL_ITEMS } from "../constants";
 import getStroke from "perfect-freehand";
-
 import rough from "roughjs/bin/rough";
 import { getArrowHeadsCoordinates, isPointCloseToLine } from "./math";
 
@@ -14,8 +13,10 @@ export const createElement = (
   y2,
   { type, stroke, fill, size }
 ) => {
+  // Ensure uniqueId is always a string
+  const uniqueId = id !== undefined ? String(id) : `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
   const element = {
-    id,
+    id: uniqueId,
     x1,
     y1,
     x2,
@@ -26,7 +27,7 @@ export const createElement = (
     size,
   };
   let options = {
-    seed: id + 1, // id can't be zero
+    seed: parseInt(uniqueId.split("-")[0]) || Date.now(), // Use first part if splitable, else fallback to Date.now()
     fillStyle: "solid",
   };
   if (stroke) {
@@ -41,7 +42,7 @@ export const createElement = (
   switch (type) {
     case TOOL_ITEMS.BRUSH: {
       const brushElement = {
-        id,
+        id: uniqueId,
         points: [{ x: x1, y: y1 }],
         path: new Path2D(getSvgPathFromStroke(getStroke([{ x: x1, y: y1 }]))),
         type,

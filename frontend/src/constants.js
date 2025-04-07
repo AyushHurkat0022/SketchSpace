@@ -25,6 +25,7 @@ export const BOARD_ACTIONS = {
   CHANGE_TEXT: "CHANGE_TEXT",
   UNDO: "UNDO",
   REDO: "REDO",
+  SET_ELEMENTS: "SET_ELEMENTS",
 };
 
 export const COLORS = {

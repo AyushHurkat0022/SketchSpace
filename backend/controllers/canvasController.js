@@ -49,15 +49,29 @@ exports.updateCanvas = async (req, res) => {
       throw new Error('Unauthorized');
     }
 
-    canvas.canvasElements = canvasElements;
+    // Merge existing elements with new ones
+    const existingElements = canvas.canvasElements || [];
+    const mergedElements = [...existingElements];
+
+    canvasElements.forEach(newElement => {
+      const index = mergedElements.findIndex(el => el.id === newElement.id);
+      if (index >= 0) {
+        mergedElements[index] = newElement; // Update existing element
+      } else {
+        mergedElements.push(newElement); // Add new element
+      }
+    });
+
+    canvas.canvasElements = mergedElements;
     canvas.lastUpdatedBy = email;
     canvas.updatedAt = Date.now();
-    
+
     await canvas.save();
     logger.info(`Canvas ${canvasId} updated by: ${email}`);
     res.json(canvas);
   } catch (error) {
-    throw error;
+    logger.error(`Update canvas error: ${error.message}`);
+    res.status(400).json({ error: error.message });
   }
 };
 

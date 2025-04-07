@@ -3,10 +3,10 @@ import rough from "roughjs";
 import boardContext from "../../store/board-context";
 import { TOOL_ACTION_TYPES, TOOL_ITEMS } from "../../constants";
 import toolboxContext from "../../store/toolbox-context";
-
+import { updateCanvas } from "../../utils/api";
 import classes from "./index.module.css";
 
-function Board() {
+function Board({ canvasId, userEmail, initialElements = [], socket }) {
   const canvasRef = useRef();
   const textAreaRef = useRef();
   const {
@@ -42,6 +42,29 @@ function Board() {
       document.removeEventListener("keydown", handleKeyDown);
     };
   }, [undo, redo]);
+
+  // Save function
+  const saveCanvas = async () => {
+    try {
+      await updateCanvas(canvasId, userEmail, elements);
+      if (socket) { // Use socket prop instead of socketRef
+        socket.emit('updateCanvas', {
+          canvasId,
+          canvasElements: elements
+        });
+      }
+    } catch (error) {
+      console.error("Failed to save canvas:", error);
+    }
+  };
+
+  // Handle save after drawing ends
+  const handleMouseUp = () => {
+    boardMouseUpHandler();
+    if (toolActionType === TOOL_ACTION_TYPES.DRAWING || toolActionType === TOOL_ACTION_TYPES.ERASING) {
+      saveCanvas();
+    }
+  };
 
   useLayoutEffect(() => {
     const canvas = canvasRef.current;
@@ -89,16 +112,8 @@ function Board() {
     }
   }, [toolActionType]);
 
-  const handleMouseDown = (event) => {
-    boardMouseDownHandler(event, toolboxState);
-  };
-
   const handleMouseMove = (event) => {
     boardMouseMoveHandler(event);
-  };
-
-  const handleMouseUp = () => {
-    boardMouseUpHandler();
   };
 
   return (
@@ -120,10 +135,16 @@ function Board() {
       <canvas
         ref={canvasRef}
         id="canvas"
-        onMouseDown={handleMouseDown}
+        onMouseDown={(event) => boardMouseDownHandler(event, toolboxState)} // Use directly, no need for handleMouseDown
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
       />
+      <button
+        onClick={saveCanvas}
+        className={classes.saveButton}
+      >
+        Save
+      </button>
     </>
   );
 }

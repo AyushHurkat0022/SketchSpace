@@ -1,4 +1,4 @@
-import React, { useCallback, useReducer } from "react";
+import React, { useCallback, useReducer, useEffect } from "react";
 
 import boardContext from "./board-context";
 import { BOARD_ACTIONS, TOOL_ACTION_TYPES, TOOL_ITEMS } from "../constants";
@@ -135,24 +135,45 @@ const boardReducer = (state, action) => {
         index: state.index + 1,
       };
     }
+    case BOARD_ACTIONS.SET_ELEMENTS: {
+      return {
+        ...state,
+        elements: action.payload.elements,
+        history: [action.payload.elements],
+        index: 0, 
+      };
+    }
     default:
       return state;
   }
 };
 
-const initialBoardState = {
-  activeToolItem: TOOL_ITEMS.BRUSH,
-  toolActionType: TOOL_ACTION_TYPES.NONE,
-  elements: [],
-  history: [[]],
-  index: 0,
-};
-
-const BoardProvider = ({ children }) => {
+const BoardProvider = ({ children, initialElements = [] }) => {
+  const initialBoardState = {
+    activeToolItem: TOOL_ITEMS.BRUSH,
+    toolActionType: TOOL_ACTION_TYPES.NONE,
+    elements: initialElements,
+    history: [initialElements],
+    index: 0,
+  };
   const [boardState, dispatchBoardAction] = useReducer(
     boardReducer,
     initialBoardState
   );
+
+  useEffect(() => {
+    dispatchBoardAction({
+      type: BOARD_ACTIONS.SET_ELEMENTS,
+      payload: { elements: initialElements },
+    });
+  }, [initialElements]);
+
+  const setElements = (elements) => {
+    dispatchBoardAction({
+      type: BOARD_ACTIONS.SET_ELEMENTS,
+      payload: { elements },
+    });
+  };
 
   const changeToolHandler = (tool) => {
     dispatchBoardAction({
@@ -256,6 +277,7 @@ const BoardProvider = ({ children }) => {
     textAreaBlurHandler,
     undo: boardUndoHandler,
     redo: boardRedoHandler,
+    setElements,
   };
 
   return (
