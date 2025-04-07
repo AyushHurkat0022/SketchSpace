@@ -90,11 +90,16 @@ export const createElement = (
 
 export const isPointNearElement = (element, pointX, pointY) => {
   const { x1, y1, x2, y2, type } = element;
-  const context = document.getElementById("canvas").getContext("2d");
+  const canvas = document.getElementById("canvas");
+  if (!canvas) return false;
+
+  const context = canvas.getContext("2d");
+
   switch (type) {
     case TOOL_ITEMS.LINE:
     case TOOL_ITEMS.ARROW:
       return isPointCloseToLine(x1, y1, x2, y2, pointX, pointY);
+
     case TOOL_ITEMS.RECTANGLE:
     case TOOL_ITEMS.CIRCLE:
       return (
@@ -103,36 +108,44 @@ export const isPointNearElement = (element, pointX, pointY) => {
         isPointCloseToLine(x2, y2, x1, y2, pointX, pointY) ||
         isPointCloseToLine(x1, y2, x1, y1, pointX, pointY)
       );
+
     case TOOL_ITEMS.BRUSH:
-      return context.isPointInPath(element.path, pointX, pointY);
+      if (element.path && context) {
+        try {
+          return context.isPointInPath(element.path, pointX, pointY);
+        } catch (err) {
+          console.error("BRUSH path error:", err, element);
+          return false;
+        }
+      }
+      return false;
+
     case TOOL_ITEMS.TEXT:
-      context.font = `${element.size}px Caveat`;
-      context.fillStyle = element.stroke;
-      const textWidth = context.measureText(element.text).width;
-      const textHeight = parseInt(element.size);
-      context.restore();
-      return (
-        isPointCloseToLine(x1, y1, x1 + textWidth, y1, pointX, pointY) ||
-        isPointCloseToLine(
-          x1 + textWidth,
-          y1,
-          x1 + textWidth,
-          y1 + textHeight,
-          pointX,
-          pointY
-        ) ||
-        isPointCloseToLine(
-          x1 + textWidth,
-          y1 + textHeight,
-          x1,
-          y1 + textHeight,
-          pointX,
-          pointY
-        ) ||
-        isPointCloseToLine(x1, y1 + textHeight, x1, y1, pointX, pointY)
-      );
+      try {
+        context.save(); // Save state before applying styles
+        context.font = `${element.size || 20}px Caveat`;
+        context.fillStyle = element.stroke || "#000000";
+
+        const textWidth = context.measureText(element.text || "").width;
+        const textHeight = parseInt(element.size || 20);
+
+        const closeTo = (
+          isPointCloseToLine(x1, y1, x1 + textWidth, y1, pointX, pointY) ||
+          isPointCloseToLine(x1 + textWidth, y1, x1 + textWidth, y1 + textHeight, pointX, pointY) ||
+          isPointCloseToLine(x1 + textWidth, y1 + textHeight, x1, y1 + textHeight, pointX, pointY) ||
+          isPointCloseToLine(x1, y1 + textHeight, x1, y1, pointX, pointY)
+        );
+
+        context.restore();
+        return closeTo;
+      } catch (err) {
+        console.error("TEXT render error:", err, element);
+        return false;
+      }
+
     default:
-      throw new Error("Type not recognized");
+      console.warn("Unknown element type:", type);
+      return false;
   }
 };
 

@@ -70,38 +70,47 @@ function Board({ canvasId, userEmail, initialElements = [], socket }) {
     const canvas = canvasRef.current;
     const context = canvas.getContext("2d");
     context.save();
-
+  
     const roughCanvas = rough.canvas(canvas);
-
-    elements.forEach((element) => {
+  
+    console.group("Canvas Render - Elements");
+    elements.forEach((element, index) => {
+      console.groupCollapsed(`Element ${index} [${element.type}]`);
+      console.log("Element details:", element);
+  
       switch (element.type) {
         case TOOL_ITEMS.LINE:
         case TOOL_ITEMS.RECTANGLE:
         case TOOL_ITEMS.CIRCLE:
         case TOOL_ITEMS.ARROW:
           roughCanvas.draw(element.roughEle);
+          console.log("Drawn using rough.js:", element.roughEle);
           break;
         case TOOL_ITEMS.BRUSH:
           context.fillStyle = element.stroke;
           context.fill(element.path);
-          context.restore();
+          console.log("Drawn using brush path.");
           break;
         case TOOL_ITEMS.TEXT:
           context.textBaseline = "top";
           context.font = `${element.size}px Caveat`;
           context.fillStyle = element.stroke;
           context.fillText(element.text, element.x1, element.y1);
-          context.restore();
+          console.log("Text drawn:", element.text);
           break;
         default:
-          throw new Error("Type not recognized");
+          console.warn("Unknown element type:", element.type);
       }
+  
+      console.groupEnd();
     });
-
+    console.groupEnd();
+  
     return () => {
       context.clearRect(0, 0, canvas.width, canvas.height);
     };
   }, [elements]);
+  
 
   useEffect(() => {
     const textarea = textAreaRef.current;

@@ -136,11 +136,21 @@ const boardReducer = (state, action) => {
       };
     }
     case BOARD_ACTIONS.SET_ELEMENTS: {
+      const processedElements = action.payload.elements.map((element) => {
+        if (element.type === TOOL_ITEMS.BRUSH) {
+          const path = new Path2D(
+            getSvgPathFromStroke(getStroke(element.points || []))
+          );
+          return { ...element, path };
+        }
+        return element;
+      });
+    
       return {
         ...state,
-        elements: action.payload.elements,
-        history: [action.payload.elements],
-        index: 0, 
+        elements: processedElements,
+        history: [processedElements],
+        index: 0,
       };
     }
     default:
