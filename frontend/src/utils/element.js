@@ -14,7 +14,7 @@ export const createElement = (
   { type, stroke, fill, size }
 ) => {
   // Ensure uniqueId is always a string
-  const uniqueId = id !== undefined ? String(id) : `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+  const uniqueId = id !== undefined ? String(id) : `${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
   const element = {
     id: uniqueId,
     x1,
@@ -80,9 +80,19 @@ export const createElement = (
       ];
       element.roughEle = gen.linearPath(points, options);
       return element;
-    case TOOL_ITEMS.TEXT:
-      element.text = "";
-      return element;
+      case TOOL_ITEMS.TEXT:
+        return {
+          id: uniqueId,
+          x1,
+          y1,
+          x2,
+          y2,
+          type,
+          text: "",  // Ensure text property is always present
+          stroke: stroke || "#000000",  // Default stroke
+          size: size || 20,  // Default size
+          fill: fill || "transparent"  // Default fill
+        };
     default:
       throw new Error("Type not recognized");
   }

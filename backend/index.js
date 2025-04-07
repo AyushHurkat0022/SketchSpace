@@ -84,7 +84,10 @@ io.on('connection', (socket) => {
       socket.emit('canvasLoaded', {
         id: canvas._id,
         name: canvas.name,
-        canvasElements: canvas.canvasElements,
+        canvasElements: canvas.canvasElements.map(element => ({
+          ...element,
+          type: element.type 
+        })),
         owner: canvas.owner,
         sharedWith: canvas.sharedWith,
         createdAt: canvas.createdAt,

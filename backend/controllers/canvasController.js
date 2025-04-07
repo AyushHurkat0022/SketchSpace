@@ -53,14 +53,14 @@ exports.updateCanvas = async (req, res) => {
     const existingElements = canvas.canvasElements || [];
     const mergedElements = [...existingElements];
 
-    canvasElements.forEach(newElement => {
-      const index = mergedElements.findIndex(el => el.id === newElement.id);
-      if (index >= 0) {
-        mergedElements[index] = newElement; // Update existing element
-      } else {
-        mergedElements.push(newElement); // Add new element
-      }
-    });
+    // canvasElements.forEach(newElement => {
+    //   const index = mergedElements.findIndex(el => el.id === newElement.id);
+    //   if (index >= 0) {
+    //     mergedElements[index] = newElement; // Update existing element
+    //   } else {
+    //     mergedElements.push(newElement); // Add new element
+    //   }
+    // });
 
     canvas.canvasElements = mergedElements;
     canvas.lastUpdatedBy = email;

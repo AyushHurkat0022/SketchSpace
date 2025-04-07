@@ -47,7 +47,7 @@ function Board({ canvasId, userEmail, initialElements = [], socket }) {
   const saveCanvas = async () => {
     try {
       await updateCanvas(canvasId, userEmail, elements);
-      if (socket) { // Use socket prop instead of socketRef
+      if (socket) {
         socket.emit('updateCanvas', {
           canvasId,
           canvasElements: elements
@@ -61,7 +61,8 @@ function Board({ canvasId, userEmail, initialElements = [], socket }) {
   // Handle save after drawing ends
   const handleMouseUp = () => {
     boardMouseUpHandler();
-    if (toolActionType === TOOL_ACTION_TYPES.DRAWING || toolActionType === TOOL_ACTION_TYPES.ERASING) {
+    if (toolActionType === TOOL_ACTION_TYPES.DRAWING || 
+        toolActionType === TOOL_ACTION_TYPES.ERASING) {
       saveCanvas();
     }
   };
@@ -125,6 +126,11 @@ function Board({ canvasId, userEmail, initialElements = [], socket }) {
     boardMouseMoveHandler(event);
   };
 
+  const handleTextBlur = (text) => {
+    textAreaBlurHandler(text);
+    saveCanvas(); // Save immediately after text input is complete
+  };
+
   return (
     <>
       {toolActionType === TOOL_ACTION_TYPES.WRITING && (
@@ -138,7 +144,7 @@ function Board({ canvasId, userEmail, initialElements = [], socket }) {
             fontSize: `${elements[elements.length - 1]?.size}px`,
             color: elements[elements.length - 1]?.stroke,
           }}
-          onBlur={(event) => textAreaBlurHandler(event.target.value)}
+          onBlur={(event) => handleTextBlur(event.target.value)}
         />
       )}
       <canvas
