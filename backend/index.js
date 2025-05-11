@@ -1,140 +1,99 @@
-const express = require('express');
-const mongoose = require('mongoose');
-const cors = require('cors');
-const rateLimit = require('express-rate-limit');
-const jwt = require('jsonwebtoken');
-const http = require('http');
-const { Server } = require('socket.io');
-const Canvas = require('./models/Canvas');
-const userRoutes = require('./routes/users');
-const canvasRoutes = require('./routes/canvasRoutes');
-const connectDB = require('./config/db');
-const errorHandler = require('./middleware/errorHandler');
-const logger = require('./logger');
-require('dotenv').config();
+const express = require("express");
+const mongoose = require("mongoose");
+const cors = require("cors");
+require("dotenv").config();
+const connectToDB = require("./config/db");
+const { Server } = require("socket.io");
+const http = require("http");
+const Canvas = require("./models/Canvas");
+const jwt = require("jsonwebtoken");
+const SECRET_KEY = "your_secret_key";
+
+const userRoutes = require("./routes/users");
+const canvasRoutes = require("./routes/canvasRoutes");
 
 const app = express();
-const server = http.createServer(app);
-const io = new Server(server, {
-  cors: {
-    origin: '*',
-    methods: ['GET', 'POST']
-  }
-});
-
-// Rate limiting
-const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 100,
-  message: 'Too many requests from this IP'
-});
 
 // Middleware
 app.use(cors());
 app.use(express.json());
-app.use(limiter);
-app.use((req, res, next) => {
-  logger.info(`${req.method} ${req.url}`);
-  next();
-});
-
-// Connect to MongoDB
-connectDB();
 
 // Routes
-app.use('/users', userRoutes);
-app.use('/canvases', canvasRoutes);
+app.use("/api/users", userRoutes);
+app.use("/api/canvas", canvasRoutes);
 
-// Error handling
-app.use(errorHandler);
+connectToDB();
 
-// Socket.io authentication middleware
-io.use((socket, next) => {
-  const token = socket.handshake.auth.token;
-  if (!token) return next(new Error('Authentication error'));
-  
-  jwt.verify(token, process.env.JWT_SECRET, (err, decoded) => {
-    if (err) return next(new Error('Authentication error'));
-    socket.user = decoded;
-    next();
-  });
+const server = http.createServer(app);
+const io = new Server(server, {
+  cors: {
+    origin: ["http://localhost:3000"],
+    methods: ["GET", "POST"],
+  },
 });
 
-// WebSocket logic
-io.on('connection', (socket) => {
-  logger.info(`Client connected: ${socket.id} | User: ${socket.user.email}`);
+let canvasData = {};
+io.on("connection", (socket) => {
+  console.log("A user connected:", socket.id);
 
-  // Handle joining a canvas room
-  socket.on('joinCanvas', async (canvasId) => {
+  socket.on("joinCanvas", async ({ canvasId }) => {
+    console.log("Joining canvas:", canvasId);
     try {
-      const canvas = await Canvas.findOne({
-        _id: canvasId,
-        $or: [
-          { owner: socket.user.id },
-          { sharedWith: socket.user.email }
-        ]
-      });
+      const authHeader = socket.handshake.headers.authorization;
+      if (!authHeader || !authHeader.startsWith("Bearer ")) {
+        console.log("No token provided.");
+        setTimeout(() => {
+          socket.emit("unauthorized", { message: "Access Denied: No Token" });
+        }, 100);
+        return;
+      }
 
-      if (!canvas) throw new Error('Canvas not found');
+      const token = authHeader.split(" ")[1];
+      const decoded = jwt.verify(token, SECRET_KEY);
+      const userId = decoded.userId;
+      console.log("User ID:", userId);
+
+      const canvas = await Canvas.findById(canvasId);
+      if (!canvas || (String(canvas.owner) !== String(userId) && !canvas.shared.includes(userId))) {
+        console.log("Unauthorized access.");
+        setTimeout(() => {
+          socket.emit("unauthorized", { message: "You are not authorized to join this canvas." });
+        }, 100);
+        return;
+      }
 
       socket.join(canvasId);
-      logger.info(`User ${socket.user.email} joined canvas ${canvasId}`);
+      console.log(`User ${socket.id} joined canvas ${canvasId}`);
 
-      // Send initial canvas data
-      socket.emit('canvasLoaded', {
-        id: canvas._id,
-        name: canvas.name,
-        canvasElements: canvas.canvasElements.map(element => ({
-          ...element,
-          type: element.type 
-        })),
-        owner: canvas.owner,
-        sharedWith: canvas.sharedWith,
-        createdAt: canvas.createdAt,
-        updatedAt: canvas.updatedAt
-      });
-
-      // Notify others
-      socket.to(canvasId).emit('userJoined', {
-        userId: socket.id,
-        userEmail: socket.user.email
-      });
+      if (canvasData[canvasId]) {
+        socket.emit("loadCanvas", canvasData[canvasId]);
+      } else {
+        socket.emit("loadCanvas", canvas.elements);
+      }
     } catch (error) {
-      logger.error(`Canvas join error: ${error.message}`);
-      socket.emit('canvasError', error.message);
+      console.error(error);
+      socket.emit("error", { message: "An error occurred while joining the canvas." });
     }
   });
 
-  // Handle canvas updates
-  socket.on('updateCanvas', async ({ canvasId, canvasElements }) => {
+  socket.on("drawingUpdate", async ({ canvasId, elements }) => {
     try {
+      canvasData[canvasId] = elements;
+
+      socket.to(canvasId).emit("receiveDrawingUpdate", elements);
+
       const canvas = await Canvas.findById(canvasId);
-      if (!canvas) throw new Error('Canvas not found');
-  
-      // Replace with new elements (assuming full state is sent)
-      canvas.canvasElements = canvasElements;
-      canvas.updatedAt = new Date();
-      canvas.lastUpdatedBy = socket.user.email;
-  
-      const updatedCanvas = await canvas.save();
-  
-      io.to(canvasId).emit('canvasUpdated', {
-        canvasElements: updatedCanvas.canvasElements,
-        updatedBy: socket.user.email,
-        timestamp: updatedCanvas.updatedAt
-      });
+      if (canvas) {
+        await Canvas.findByIdAndUpdate(canvasId, { elements }, { new: true, useFindAndModify: false });
+      }
     } catch (error) {
-      logger.error(`Canvas update error: ${error.message}`);
+      console.error(error);
     }
   });
 
-  // Handle disconnection
-  socket.on('disconnect', () => {
-    logger.info(`Client disconnected: ${socket.id}`);
+  socket.on("disconnect", () => {
+    console.log("User disconnected:", socket.id);
   });
 });
 
-const PORT = process.env.PORT || 3030;
-server.listen(PORT, () => {
-  logger.info(`Server running on port ${PORT}`);
-});
+server.listen(3030, () => console.log("Server running on port 3030"));

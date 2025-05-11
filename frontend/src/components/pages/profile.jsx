@@ -1,14 +1,19 @@
+// src/components/pages/profile.jsx
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { jwtDecode } from "jwt-decode";
+import { createCanvas, deleteCanvas, shareCanvas } from "../../utils/api";
 
 const Profile = () => {
   const navigate = useNavigate();
   const [user, setUser] = useState({ name: "", email: "" });
   const [canvases, setCanvases] = useState([]);
   const [canvasName, setCanvasName] = useState("");
+  const [shareEmail, setShareEmail] = useState("");
+  const [shareCanvasId, setShareCanvasId] = useState(null);
+  const [shareMessage, setShareMessage] = useState("");
   const [error, setError] = useState("");
-  const [sharedEmails, setSharedEmails] = useState(null); // State to track which canvas's shared emails to show
+  const [sharedEmails, setSharedEmails] = useState(null);
 
   useEffect(() => {
     const token = localStorage.getItem("token");
@@ -50,37 +55,13 @@ const Profile = () => {
     }
 
     setError("");
-    const token = localStorage.getItem("token");
     try {
-      const requestBody = {
-        email: user.email,
-        canvasElements: [],
-        canvasSharedWith: [],
-        name: canvasName,
-      };
-      const response = await fetch("http://localhost:3030/canvases", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify(requestBody),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(
-          `Failed to create canvas: ${response.status} - ${
-            data.error || data.message || "Unknown error"
-          }`
-        );
-      }
-
-      setCanvases((prev) => [...prev, data]);
+      const newCanvas = await createCanvas(user.email, canvasName);
+      setCanvases((prev) => [...prev, newCanvas]);
       setCanvasName("");
     } catch (error) {
       console.error("Error creating canvas:", error);
+      setError("Failed to create canvas");
     }
   };
 
@@ -89,33 +70,41 @@ const Profile = () => {
   };
 
   const handleDeleteCanvas = async (canvasId, isOwner) => {
-    const token = localStorage.getItem("token");
     try {
-      const response = await fetch(`http://localhost:3030/canvases/${canvasId}`, {
-        method: "DELETE",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ email: user.email }),
-      });
-      if (!response.ok) throw new Error("Failed to delete canvas");
+      await deleteCanvas(canvasId, user.email);
       setCanvases((prev) => prev.filter((canvas) => canvas._id !== canvasId));
     } catch (error) {
       console.error("Error deleting canvas:", error);
+      setError("Failed to delete canvas");
     }
   };
 
-  const handleShareCanvas = (canvasId) => {
-    console.log(`Sharing canvas with ID: ${canvasId}`);
+  const handleShareCanvas = async (canvasId) => {
+    if (!shareEmail.trim()) {
+      setShareMessage("Please enter an email.");
+      return;
+    }
+
+    try {
+      setShareMessage("");
+      await shareCanvas(canvasId, user.email, shareEmail);
+      setShareMessage("Canvas shared successfully!");
+      setShareEmail("");
+      setShareCanvasId(null);
+      fetchCanvases(user.email);
+      setTimeout(() => setShareMessage(""), 5000);
+    } catch (error) {
+      console.error("Error sharing canvas:", error);
+      setShareMessage(error.message || "Failed to share canvas.");
+      setTimeout(() => setShareMessage(""), 5000);
+    }
   };
 
   const handleShowSharedWith = (canvasId, sharedWith) => {
-    // Toggle shared emails display
     if (sharedEmails === canvasId) {
-      setSharedEmails(null); // Hide if already showing
+      setSharedEmails(null);
     } else {
-      setSharedEmails(canvasId); // Show for this canvas
+      setSharedEmails(canvasId);
     }
   };
 
@@ -208,26 +197,57 @@ const Profile = () => {
                         : "None"}
                     </div>
                   )}
-                  <div className="flex justify-between mt-4 gap-2">
-                    <button
-                      onClick={() => handleShareCanvas(canvas._id)}
-                      className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-all"
-                    >
-                      Share
-                    </button>
-                    <button
-                      onClick={() => handleShowSharedWith(canvas._id, canvas.canvasSharedWith)}
-                      className="px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-all"
-                    >
-                      Shared With
-                    </button>
-                    <button
-                      onClick={() => handleDeleteCanvas(canvas._id, canvas.email === user.email)}
-                      className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-all"
-                    >
-                      {canvas.email === user.email ? "Delete" : "Remove"}
-                    </button>
-                  </div>
+                  {shareCanvasId === canvas._id ? (
+                    <div className="mt-4">
+                      <input
+                        type="email"
+                        value={shareEmail}
+                        onChange={(e) => setShareEmail(e.target.value)}
+                        placeholder="Enter email to share with"
+                        className="w-full p-2 border rounded-md mb-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                      <div className="flex justify-between gap-2">
+                        <button
+                          onClick={() => handleShareCanvas(canvas._id)}
+                          className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-all"
+                        >
+                          Send Invite
+                        </button>
+                        <button
+                          onClick={() => setShareCanvasId(null)}
+                          className="px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-all"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                      {shareMessage && (
+                        <p className={`mt-2 text-sm ${shareMessage.includes("successfully") ? "text-green-600" : "text-red-600"}`}>
+                          {shareMessage}
+                        </p>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="flex justify-between mt-4 gap-2">
+                      <button
+                        onClick={() => setShareCanvasId(canvas._id)}
+                        className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-all"
+                      >
+                        Share
+                      </button>
+                      <button
+                        onClick={() => handleShowSharedWith(canvas._id, canvas.canvasSharedWith)}
+                        className="px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-all"
+                      >
+                        Shared With
+                      </button>
+                      <button
+                        onClick={() => handleDeleteCanvas(canvas._id, canvas.email === user.email)}
+                        className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-all"
+                      >
+                        {canvas.email === user.email ? "Delete" : "Remove"}
+                      </button>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>

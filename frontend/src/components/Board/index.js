@@ -1,3 +1,4 @@
+// src/components/Board/index.jsx
 import { useContext, useEffect, useLayoutEffect, useRef } from "react";
 import rough from "roughjs";
 import boardContext from "../../store/board-context";
@@ -43,7 +44,6 @@ function Board({ canvasId, userEmail, initialElements = [], socket }) {
     };
   }, [undo, redo]);
 
-  // Save function
   const saveCanvas = async () => {
     try {
       await updateCanvas(canvasId, userEmail, elements);
@@ -58,7 +58,6 @@ function Board({ canvasId, userEmail, initialElements = [], socket }) {
     }
   };
 
-  // Handle save after drawing ends
   const handleMouseUp = () => {
     boardMouseUpHandler();
     if (toolActionType === TOOL_ACTION_TYPES.DRAWING || 
@@ -74,44 +73,33 @@ function Board({ canvasId, userEmail, initialElements = [], socket }) {
   
     const roughCanvas = rough.canvas(canvas);
   
-    console.group("Canvas Render - Elements");
-    elements.forEach((element, index) => {
-      console.groupCollapsed(`Element ${index} [${element.type}]`);
-      console.log("Element details:", element);
-  
+    elements.forEach((element) => {
       switch (element.type) {
         case TOOL_ITEMS.LINE:
         case TOOL_ITEMS.RECTANGLE:
         case TOOL_ITEMS.CIRCLE:
         case TOOL_ITEMS.ARROW:
           roughCanvas.draw(element.roughEle);
-          console.log("Drawn using rough.js:", element.roughEle);
           break;
         case TOOL_ITEMS.BRUSH:
           context.fillStyle = element.stroke;
           context.fill(element.path);
-          console.log("Drawn using brush path.");
           break;
         case TOOL_ITEMS.TEXT:
           context.textBaseline = "top";
           context.font = `${element.size}px Caveat`;
           context.fillStyle = element.stroke;
           context.fillText(element.text, element.x1, element.y1);
-          console.log("Text drawn:", element.text);
           break;
         default:
           console.warn("Unknown element type:", element.type);
       }
-  
-      console.groupEnd();
     });
-    console.groupEnd();
   
     return () => {
       context.clearRect(0, 0, canvas.width, canvas.height);
     };
   }, [elements]);
-  
 
   useEffect(() => {
     const textarea = textAreaRef.current;
@@ -128,7 +116,7 @@ function Board({ canvasId, userEmail, initialElements = [], socket }) {
 
   const handleTextBlur = (text) => {
     textAreaBlurHandler(text);
-    saveCanvas(); // Save immediately after text input is complete
+    saveCanvas();
   };
 
   return (
@@ -150,7 +138,7 @@ function Board({ canvasId, userEmail, initialElements = [], socket }) {
       <canvas
         ref={canvasRef}
         id="canvas"
-        onMouseDown={(event) => boardMouseDownHandler(event, toolboxState)} // Use directly, no need for handleMouseDown
+        onMouseDown={(event) => boardMouseDownHandler(event, toolboxState)}
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
       />

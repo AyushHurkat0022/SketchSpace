@@ -1,33 +1,25 @@
-const mongoose = require('mongoose');
+const mongoose = require("mongoose");
 
 const canvasSchema = new mongoose.Schema({
-  name: {
-    type: String,
-    default: null,
-  },
-  email: {  // Creator's email
-    type: String,
+  owner: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "User",
     required: true,
   },
-  lastUpdatedBy: {
-    type: String,
-    default: null,
-  },
-  canvasElements: {
+  shared: [
+    {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+    },
+  ],
+  elements: {
     type: Array,
     default: [],
   },
-  canvasSharedWith: [{
-    type: String,  // Array of emails
-  }],
   createdAt: {
-    type: Date,
-    default: Date.now,
-  },
-  updatedAt: {
     type: Date,
     default: Date.now,
   },
 });
 
-module.exports = mongoose.model('Canvas', canvasSchema);
+module.exports = mongoose.model("Canvas", canvasSchema);

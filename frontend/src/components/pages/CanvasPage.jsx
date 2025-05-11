@@ -1,3 +1,4 @@
+// src/components/pages/CanvasPage.jsx
 import { useParams, useNavigate } from "react-router-dom";
 import { useEffect, useState, useRef, useCallback } from "react";
 import { io } from "socket.io-client";
@@ -15,12 +16,12 @@ const CanvasPage = () => {
   const [canvasData, setCanvasData] = useState(null);
   const [userEmail, setUserEmail] = useState("");
   const [shareEmail, setShareEmail] = useState("");
+  const [shareMessage, setShareMessage] = useState("");
   const [loading, setLoading] = useState(true);
   const [isSharePopupOpen, setIsSharePopupOpen] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const socketRef = useRef(null);
 
-  // Log component initialization
   useEffect(() => {
     console.log(`CanvasPage component initialized for canvas ID: ${canvasid}`);
     return () => {
@@ -28,7 +29,6 @@ const CanvasPage = () => {
     };
   }, [canvasid]);
 
-  // Verify token and set user email
   useEffect(() => {
     console.log("Starting token verification...");
     const token = localStorage.getItem("token");
@@ -49,7 +49,6 @@ const CanvasPage = () => {
     }
   }, [navigate]);
 
-  // Memoized fetchCanvas function
   const fetchCanvas = useCallback(async () => {
     console.log(`Fetching canvas data for canvas ID: ${canvasid}`);
     const token = localStorage.getItem("token");
@@ -71,7 +70,7 @@ const CanvasPage = () => {
       const canvas = data.find((c) => c._id === canvasid);
       if (canvas) {
         console.log(`Found canvas with ID ${canvasid}, setting canvas data`);
- setCanvasData(canvas);
+        setCanvasData(canvas);
       } else {
         console.warn(`Canvas with ID ${canvasid} not found in user's canvases`);
       }
@@ -83,7 +82,6 @@ const CanvasPage = () => {
     }
   }, [userEmail, canvasid]);
 
-  // Memoized setupWebSocket function
   const setupWebSocket = useCallback(() => {
     console.log("Setting up WebSocket connection...");
     socketRef.current = io("http://localhost:3030", {
@@ -95,7 +93,7 @@ const CanvasPage = () => {
     socketRef.current.on("connect", () => {
       console.log(`Connected to WebSocket server with socket ID: ${socketRef.current.id}`);
       console.log(`Joining canvas ${canvasid} as user ${userEmail}`);
-      socketRef.current.emit("joinCanvas", { // Changed to match backend event name
+      socketRef.current.emit("joinCanvas", {
         canvasId: canvasid,
         userEmail: userEmail,
       });
@@ -119,7 +117,7 @@ const CanvasPage = () => {
       }));
     });
 
-    socketRef.current.on("userJoined", (data) => { // Changed to match backend event name
+    socketRef.current.on("userJoined", (data) => {
       console.log(`User ${data.userEmail} joined the canvas ${data.canvasId}`);
     });
 
@@ -143,7 +141,6 @@ const CanvasPage = () => {
     };
   }, [canvasid, userEmail]);
 
-  // Setup WebSocket and fetch canvas data
   useEffect(() => {
     if (!userEmail) {
       console.log("User email not set, skipping WebSocket setup and canvas fetch");
@@ -162,16 +159,20 @@ const CanvasPage = () => {
     };
   }, [userEmail, fetchCanvas, setupWebSocket]);
 
-  // Handle sharing the canvas
   const handleShare = useCallback(async () => {
     console.log(`Attempting to share canvas with ${shareEmail}`);
-    const token = localStorage.getItem("token");
+    if (!shareEmail.trim()) {
+      setShareMessage("Please enter an email.");
+      return;
+    }
+
     try {
+      setShareMessage("");
       const response = await fetch(`http://localhost:3030/canvases/${canvasid}/share`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
         },
         body: JSON.stringify({ shareWithEmail: shareEmail, ownerEmail: userEmail }),
       });
@@ -182,27 +183,33 @@ const CanvasPage = () => {
       }
 
       console.log(`Successfully shared canvas with ${shareEmail}`);
+      setShareMessage("Canvas shared successfully!");
       setShareEmail("");
       setIsSharePopupOpen(false);
       fetchCanvas();
+      setTimeout(() => setShareMessage(""), 5000);
     } catch (error) {
       console.error("Error sharing canvas:", error);
+      setShareMessage(error.message || "Failed to share canvas.");
+      setTimeout(() => setShareMessage(""), 5000);
     }
   }, [canvasid, shareEmail, userEmail, fetchCanvas]);
 
-  // Log when canvas data changes
+  const handleLogout = () => {
+    localStorage.removeItem("token");
+    navigate("/auth");
+  };
+
   useEffect(() => {
     if (canvasData) {
       console.log(`Canvas data updated. Shared with ${canvasData.canvasSharedWith.length} users.`);
     }
   }, [canvasData]);
 
-  // Log when share popup state changes
   useEffect(() => {
     console.log(`Share popup is now ${isSharePopupOpen ? 'open' : 'closed'}`);
   }, [isSharePopupOpen]);
 
-  // Log when menu state changes
   useEffect(() => {
     console.log(`Menu is now ${isMenuOpen ? 'open' : 'closed'}`);
   }, [isMenuOpen]);
@@ -212,7 +219,6 @@ const CanvasPage = () => {
       <ToolboxProvider>
         <div className="relative min-h-screen bg-gray-100">
           <Toolbar />
-          {/* Hamburger Menu */}
           <div className="absolute top-4 left-4 z-20">
             <button
               onClick={() => {
@@ -226,7 +232,7 @@ const CanvasPage = () => {
             {isMenuOpen && canvasData && (
               <div className="absolute top-12 left-0 w-64 bg-white rounded-lg shadow-xl p-4">
                 <h3 className="font-semibold text-gray-800 mb-2">Shared With:</h3>
-                <ul className="text-sm text-gray-600">
+                <ul className="text-sm text-gray-600 mb-4">
                   {canvasData.canvasSharedWith.length > 0 ? (
                     canvasData.canvasSharedWith.map((email, index) => (
                       <li key={index} className="py-1">
@@ -237,11 +243,15 @@ const CanvasPage = () => {
                     <li>Not shared with anyone</li>
                   )}
                 </ul>
+                <button
+                  onClick={handleLogout}
+                  className="w-full bg-red-500 text-white py-2 rounded-md hover:bg-red-600 transition"
+                >
+                  Logout
+                </button>
               </div>
             )}
           </div>
-
-          {/* Share Button and Popup */}
           <div className="absolute top-4 right-4 z-10">
             <button
               onClick={() => {
@@ -282,10 +292,14 @@ const CanvasPage = () => {
                 >
                   Send Invite
                 </button>
+                {shareMessage && (
+                  <p className={`mt-2 text-sm ${shareMessage.includes("successfully") ? "text-green-600" : "text-red-600"}`}>
+                    {shareMessage}
+                  </p>
+                )}
               </div>
             )}
           </div>
-
           {loading ? (
             <div className="flex items-center justify-center h-screen">Loading...</div>
           ) : canvasData ? (

@@ -1,3 +1,4 @@
+// src/components/pages/welcome.tsx
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from "react-router-dom";
 
@@ -59,7 +60,6 @@ const WelcomePage: React.FC = () => {
 
         const line = welcomeLines[currentLine];
         if (currentSegment >= line.length) {
-            // Move to next line after 10 seconds
             const timeout = setTimeout(() => {
                 setCurrentLine(l => l + 1);
                 setCurrentSegment(0);
@@ -70,13 +70,11 @@ const WelcomePage: React.FC = () => {
 
         const segment = line[currentSegment];
         if (currentChar < segment.text.length) {
-            // Type next character
             const timeout = setTimeout(() => {
                 setCurrentChar(c => c + 1);
             }, 50);
             return () => clearTimeout(timeout);
         } else {
-            // Move to next segment
             setCurrentSegment(s => s + 1);
             setCurrentChar(0);
         }
@@ -92,7 +90,6 @@ const WelcomePage: React.FC = () => {
                 const segment = welcomeLines[lineIdx][segIdx];
 
                 if (lineIdx < currentLine || (lineIdx === currentLine && segIdx < currentSegment)) {
-                    // Fully displayed segment
                     lineContent.push(
                         segment.highlight ? (
                             <span key={segIdx} style={{ color: '#e0ae2a', fontWeight: 'bold' }}>
@@ -101,7 +98,6 @@ const WelcomePage: React.FC = () => {
                         ) : <span key={segIdx}>{segment.text}</span>
                     );
                 } else if (lineIdx === currentLine && segIdx === currentSegment) {
-                    // Currently typing segment
                     const visibleText = segment.text.slice(0, currentChar);
                     lineContent.push(
                         segment.highlight ? (
@@ -119,7 +115,6 @@ const WelcomePage: React.FC = () => {
 
     return (
         <div className="min-h-screen p-8 rounded-lg shadow-lg text-center max-w-full flex flex-col justify-center items-center bg-starry">
-            {/* Header remains unchanged */}
             <div className="header absolute top-0 left-0 right-0 p-8 text-center z-20 mb-4">
                 <h1 className="text-yellow-600 text-4xl font-bold mb-2 lg:text-5xl drop-shadow-[0px_0px_32px_rgba(224,174,42,1.0)]">
                     SketchSpace
@@ -128,23 +123,19 @@ const WelcomePage: React.FC = () => {
                     Draw Your Vision, Share Your Story.
                 </p>
             </div>
-            <div className="welcome-msg left-aligned bg-gray-100 p-6 pl-14 pr-14 rounded-lg border border-yellow-600 lg:p-10 max-w-2xl w-full lg: z-10 relative">
+            <div className="welcome-msg left-aligned bg-gray-100 p-6 pl-14 pr-14 rounded-lg border stewards-yellow-600 lg:p-10 max-w-2xl w-full lg: z-10 relative">
                 {displayedContent}
             </div>
-
-            {/* Rest of the components remain unchanged */}
             <div className="text-box fixed bottom-24 left-1/2 -translate-x-1/2 z-30">
-      <div className="border-2 border-[#e0ae2a] rounded-md p-4 bg-[#F1E7D4] relative overflow-hidden shadow-2xl transition-[background-position_0s_ease] bg-[length:250%_250%,100%_100%] bg-[position:-100%_0,0_0] bg-no-repeat hover:bg-[position:200%_0,0_0] hover:duration-[1500ms] bg-[linear-gradient(45deg,transparent_25%,rgba(224,174,42,0.3)_50%,transparent_75%,transparent_100%)]">
-        <h2>Let’s Get Started</h2>
-      </div>
-    </div>
-
-    {/* Login button fixed at bottom */}
-    <div className="login fixed bottom-0 left-0 right-0 text-center p-4 bg-starry bg-opacity-90 z-30">
-      <button onClick={handleLogin} className="border-2 border-[#e0ae2a] rounded-xl m-4 p-2 bg-[#F1E7D4] hover:bg-[#e0ae2a] hover:text-white transition-colors duration-300">
-        Login
-      </button>
-    </div>
+                <div className="border-2 border-[#e0ae2a] rounded-md p-4 bg-[#F1E7D4] relative overflow-hidden shadow-2xl transition-[background-position_0s_ease] bg-[length:250%_250%,100%_100%] bg-[position:-100%_0,0_0] bg-no-repeat hover:bg-[position:200%_0,0_0] hover:duration-[1500ms] bg-[linear-gradient(45deg,transparent_25%,rgba(224,174,42,0.3)_50%,transparent_75%,transparent_100%)]">
+                    <h2>Let’s Get Started</h2>
+                </div>
+            </div>
+            <div className="login fixed bottom-0 left-0 right-0 text-center p-4 bg-starry bg-opacity-90 z-30">
+                <button onClick={handleLogin} className="border-2 border-[#e0ae2a] rounded-xl m-4 p-2 bg-[#F1E7D4] hover:bg-[#e0ae2a] hover:text-white transition-colors duration-300">
+                    Login
+                </button>
+            </div>
         </div>
     );
 };
