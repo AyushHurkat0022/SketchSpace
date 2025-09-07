@@ -58,6 +58,23 @@ connectDB();
 app.use('/users', userRoutes);
 app.use('/canvases', canvasRoutes);
 
+app.get('/health', async (req, res) => {
+  try {
+    const dbState = mongoose.connection.readyState; 
+    res.status(200).json({
+      status: 'ok',
+      uptime: process.uptime(),
+      timestamp: new Date(),
+      db: dbState === 1 ? 'connected' : 'disconnected'
+    });
+  } catch (error) {
+    res.status(500).json({
+      status: 'error',
+      message: error.message
+    });
+  }
+});
+
 // Error handling
 app.use(errorHandler);
 

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { jwtDecode } from "jwt-decode";
 
@@ -8,7 +8,23 @@ const Profile = () => {
   const [canvases, setCanvases] = useState([]);
   const [canvasName, setCanvasName] = useState("");
   const [error, setError] = useState("");
-  const [sharedEmails, setSharedEmails] = useState(null); // State to track which canvas's shared emails to show
+  const [sharedEmails, setSharedEmails] = useState(null);
+  const API_URL = process.env.REACT_APP_API_URL || "http://localhost:3030";
+
+  // ✅ useCallback to avoid re-creation on every render
+  const fetchCanvases = useCallback(async (email) => {
+    const token = localStorage.getItem("token");
+    try {
+      const response = await fetch(`${API_URL}/canvases/${email}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!response.ok) throw new Error("Failed to fetch canvases");
+      const data = await response.json();
+      setCanvases(data);
+    } catch (error) {
+      console.error("Error fetching canvases:", error);
+    }
+  }, [API_URL]);
 
   useEffect(() => {
     const token = localStorage.getItem("token");
@@ -27,21 +43,7 @@ const Profile = () => {
       console.error("Invalid token", error);
       navigate("/auth");
     }
-  }, [navigate]);
-
-  const fetchCanvases = async (email) => {
-    const token = localStorage.getItem("token");
-    try {
-      const response = await fetch(`http://localhost:3030/canvases/${email}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (!response.ok) throw new Error("Failed to fetch canvases");
-      const data = await response.json();
-      setCanvases(data);
-    } catch (error) {
-      console.error("Error fetching canvases:", error);
-    }
-  };
+  }, [navigate, fetchCanvases]);
 
   const handleCreateCanvas = async () => {
     if (!canvasName.trim()) {
@@ -58,7 +60,7 @@ const Profile = () => {
         canvasSharedWith: [],
         name: canvasName,
       };
-      const response = await fetch("http://localhost:3030/canvases", {
+      const response = await fetch(`${API_URL}/canvases`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -91,7 +93,7 @@ const Profile = () => {
   const handleDeleteCanvas = async (canvasId, isOwner) => {
     const token = localStorage.getItem("token");
     try {
-      const response = await fetch(`http://localhost:3030/canvases/${canvasId}`, {
+      const response = await fetch(`${API_URL}/canvases/${canvasId}`, {
         method: "DELETE",
         headers: {
           "Content-Type": "application/json",
@@ -110,13 +112,8 @@ const Profile = () => {
     console.log(`Sharing canvas with ID: ${canvasId}`);
   };
 
-  const handleShowSharedWith = (canvasId, sharedWith) => {
-    // Toggle shared emails display
-    if (sharedEmails === canvasId) {
-      setSharedEmails(null); // Hide if already showing
-    } else {
-      setSharedEmails(canvasId); // Show for this canvas
-    }
+  const handleShowSharedWith = (canvasId) => {
+    setSharedEmails((prev) => (prev === canvasId ? null : canvasId));
   };
 
   const handleLogout = () => {
@@ -127,6 +124,7 @@ const Profile = () => {
   return (
     <div className="min-h-screen p-8 flex flex-col bg-gray-100">
       <div className="w-full max-w-5xl mx-auto">
+        {/* Header */}
         <div className="flex justify-between items-center mb-8">
           <div>
             <h1 className="text-yellow-600 text-4xl font-bold mb-2 lg:text-5xl">
@@ -144,13 +142,17 @@ const Profile = () => {
           </button>
         </div>
 
+        {/* Welcome */}
         <div className="mb-8">
           <h2 className="text-3xl font-bold text-yellow-600">
             Welcome Back, {user.name}! 👋
           </h2>
-          <p className="text-gray-600 mt-2">Manage and create your canvas projects</p>
+          <p className="text-gray-600 mt-2">
+            Manage and create your canvas projects
+          </p>
         </div>
 
+        {/* Create Canvas */}
         <div className="mb-8">
           <div className="flex flex-col gap-2">
             {error && <p className="text-red-500 text-sm">{error}</p>}
@@ -177,8 +179,11 @@ const Profile = () => {
           </div>
         </div>
 
+        {/* Canvas List */}
         <div>
-          <h3 className="text-xl font-bold text-yellow-600 mb-4">Your Canvases</h3>
+          <h3 className="text-xl font-bold text-yellow-600 mb-4">
+            Your Canvases
+          </h3>
           {canvases.length > 0 ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
               {canvases.map((canvas) => (
@@ -196,15 +201,19 @@ const Profile = () => {
                     {canvas.name || `${user.name}'s Canvas`}
                   </h4>
                   <div className="text-sm text-gray-600 mt-2">
-                    Created by: {canvas.email === user.email ? user.name : canvas.email}
+                    Created by:{" "}
+                    {canvas.email === user.email ? user.name : canvas.email}
                   </div>
                   <div className="text-sm text-gray-600">
-                    Last updated by: {canvas.lastUpdatedBy || canvas.email === user.email ? user.name : canvas.email}
+                    Last updated by:{" "}
+                    {canvas.lastUpdatedBy ||
+                      (canvas.email === user.email ? user.name : canvas.email)}
                   </div>
                   {sharedEmails === canvas._id && (
                     <div className="text-sm text-gray-600 mt-2">
-                      Shared with: {canvas.canvasSharedWith.length > 0 
-                        ? canvas.canvasSharedWith.join(", ") 
+                      Shared with:{" "}
+                      {canvas.canvasSharedWith.length > 0
+                        ? canvas.canvasSharedWith.join(", ")
                         : "None"}
                     </div>
                   )}
@@ -216,13 +225,17 @@ const Profile = () => {
                       Share
                     </button>
                     <button
-                      onClick={() => handleShowSharedWith(canvas._id, canvas.canvasSharedWith)}
+                      onClick={() =>
+                        handleShowSharedWith(canvas._id, canvas.canvasSharedWith)
+                      }
                       className="px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-all"
                     >
                       Shared With
                     </button>
                     <button
-                      onClick={() => handleDeleteCanvas(canvas._id, canvas.email === user.email)}
+                      onClick={() =>
+                        handleDeleteCanvas(canvas._id, canvas.email === user.email)
+                      }
                       className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-all"
                     >
                       {canvas.email === user.email ? "Delete" : "Remove"}
