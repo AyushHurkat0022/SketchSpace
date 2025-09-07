@@ -75,7 +75,7 @@
 //             >
 //                 <source src="https://videos.pexels.com/video-files/857251/857251-hd_1620_1080_25fps.mp4" type="video/mp4" />
 //             </video>
-            
+
 //             {/* Overlay */}
 //             <div className="absolute inset-0 bg-black bg-opacity-50" />
 //             <div className="header absolute top-0 left-0 right-0 p-8 text-center z-20 mb-4">
@@ -159,6 +159,7 @@ const Login: React.FC = () => {
   const [tabUnderlineWidth, setTabUnderlineWidth] = useState(0);
   const [tabUnderlineLeft, setTabUnderlineLeft] = useState(0);
   const navigate = useNavigate();
+  const API_URL = process.env.REACT_APP_API_URL || "http://localhost:3030";
 
   useEffect(() => {
     if (activeTabIndex === null) return;
@@ -189,9 +190,10 @@ const Login: React.FC = () => {
     e.preventDefault();
     setMessage("");
 
-    const apiUrl = activeTabIndex === 0 
-      ? "http://localhost:3030/users/login" 
-      : "http://localhost:3030/users/register";
+    const apiUrl =
+      activeTabIndex === 0
+        ? `${API_URL}/users/login`
+        : `${API_URL}/users/register`;
     const payload = activeTabIndex === 0
       ? { email: formData.email, password: formData.password }
       : { username: formData.username, email: formData.email, password: formData.password };
@@ -211,15 +213,15 @@ const Login: React.FC = () => {
 
   return (
     <div className="min-h-screen p-8 rounded-lg shadow-lg text-center flex flex-col justify-center items-center">
-      <video 
-        autoPlay 
-        loop 
-        muted 
+      <video
+        autoPlay
+        loop
+        muted
         className="absolute top-0 left-0 w-full h-full object-cover"
       >
         <source src="https://videos.pexels.com/video-files/857251/857251-hd_1620_1080_25fps.mp4" type="video/mp4" />
       </video>
-      
+
       <div className="absolute inset-0 bg-black bg-opacity-50" />
       <div className="header absolute top-0 left-0 right-0 p-8 text-center z-20 mb-4">
         <h1 className="text-yellow-600 text-4xl font-bold mb-2 lg:text-5xl drop-shadow-[0px_0px_32px_rgba(224,174,42,1.0)]">

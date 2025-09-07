@@ -1,7 +1,7 @@
 // utils/api.js
 import axios from "axios";
 
-const API_BASE_URL = "http://localhost:3030/canvases";
+const API_BASE_URL = `${process.env.REACT_APP_API_URL || "http://localhost:3030"}/canvases`;
 
 export const updateCanvas = async (canvasId, email, elements) => {
   const token = localStorage.getItem("token");

@@ -19,8 +19,8 @@ const CanvasPage = () => {
   const [isSharePopupOpen, setIsSharePopupOpen] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const socketRef = useRef(null);
+  const API_URL = process.env.REACT_APP_API_URL || "http://localhost:3030";
 
-  // Log component initialization
   useEffect(() => {
     console.log(`CanvasPage component initialized for canvas ID: ${canvasid}`);
     return () => {
@@ -55,9 +55,10 @@ const CanvasPage = () => {
     const token = localStorage.getItem("token");
     setLoading(true);
     try {
-      const response = await fetch(`http://localhost:3030/canvases/${userEmail}`, {
+      const response = await fetch(`${API_URL}/canvases/${userEmail}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
+
 
       if (!response.ok) {
         const errorText = await response.text();
@@ -71,7 +72,7 @@ const CanvasPage = () => {
       const canvas = data.find((c) => c._id === canvasid);
       if (canvas) {
         console.log(`Found canvas with ID ${canvasid}, setting canvas data`);
- setCanvasData(canvas);
+        setCanvasData(canvas);
       } else {
         console.warn(`Canvas with ID ${canvasid} not found in user's canvases`);
       }
@@ -81,16 +82,15 @@ const CanvasPage = () => {
       console.log("Finished canvas fetch operation");
       setLoading(false);
     }
-  }, [userEmail, canvasid]);
+  }, [userEmail, canvasid, API_URL]);
 
   // Memoized setupWebSocket function
   const setupWebSocket = useCallback(() => {
     console.log("Setting up WebSocket connection...");
-    socketRef.current = io("http://localhost:3030", {
-      auth: {
-        token: localStorage.getItem("token"),
-      },
+    socketRef.current = io(API_URL, {
+      auth: { token: localStorage.getItem("token") },
     });
+
 
     socketRef.current.on("connect", () => {
       console.log(`Connected to WebSocket server with socket ID: ${socketRef.current.id}`);
@@ -141,7 +141,7 @@ const CanvasPage = () => {
       socketRef.current.off("user left");
       socketRef.current.off("error");
     };
-  }, [canvasid, userEmail]);
+  }, [canvasid, userEmail, API_URL]);
 
   // Setup WebSocket and fetch canvas data
   useEffect(() => {
@@ -167,7 +167,7 @@ const CanvasPage = () => {
     console.log(`Attempting to share canvas with ${shareEmail}`);
     const token = localStorage.getItem("token");
     try {
-      const response = await fetch(`http://localhost:3030/canvases/${canvasid}/share`, {
+      const response = await fetch(`${API_URL}/canvases/${canvasid}/share`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -188,7 +188,7 @@ const CanvasPage = () => {
     } catch (error) {
       console.error("Error sharing canvas:", error);
     }
-  }, [canvasid, shareEmail, userEmail, fetchCanvas]);
+  }, [canvasid, shareEmail, userEmail, fetchCanvas, API_URL]);
 
   // Log when canvas data changes
   useEffect(() => {

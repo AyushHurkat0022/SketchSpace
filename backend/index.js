@@ -1,3 +1,4 @@
+require('dotenv').config();
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
@@ -11,16 +12,30 @@ const canvasRoutes = require('./routes/canvasRoutes');
 const connectDB = require('./config/db');
 const errorHandler = require('./middleware/errorHandler');
 const logger = require('./logger');
-require('dotenv').config();
 
 const app = express();
 const server = http.createServer(app);
-const io = new Server(server, {
-  cors: {
-    origin: '*',
-    methods: ['GET', 'POST']
-  }
-});
+
+// Allowed origins for CORS
+const allowedOrigins = [
+  'https://sketchspace.onrender.com', // live frontend
+  'http://localhost:3000'             // local dev frontend
+];
+
+// Middleware
+app.use(cors({
+  origin: function (origin, callback) {
+    if (!origin) return callback(null, true); // allow requests with no origin
+    if (allowedOrigins.indexOf(origin) === -1) {
+      const msg = `The CORS policy for this site does not allow access from the specified Origin: ${origin}`;
+      return callback(new Error(msg), false);
+    }
+    return callback(null, true);
+  },
+  credentials: true,
+}));
+
+app.use(express.json());
 
 // Rate limiting
 const limiter = rateLimit({
@@ -28,11 +43,9 @@ const limiter = rateLimit({
   max: 100,
   message: 'Too many requests from this IP'
 });
-
-// Middleware
-app.use(cors());
-app.use(express.json());
 app.use(limiter);
+
+// Logging middleware
 app.use((req, res, next) => {
   logger.info(`${req.method} ${req.url}`);
   next();
@@ -47,6 +60,15 @@ app.use('/canvases', canvasRoutes);
 
 // Error handling
 app.use(errorHandler);
+
+// Socket.io setup
+const io = new Server(server, {
+  cors: {
+    origin: allowedOrigins,
+    methods: ['GET', 'POST'],
+    credentials: true
+  }
+});
 
 // Socket.io authentication middleware
 io.use((socket, next) => {
@@ -64,7 +86,7 @@ io.use((socket, next) => {
 io.on('connection', (socket) => {
   logger.info(`Client connected: ${socket.id} | User: ${socket.user.email}`);
 
-  // Handle joining a canvas room
+  // Join canvas room
   socket.on('joinCanvas', async (canvasId) => {
     try {
       const canvas = await Canvas.findOne({
@@ -80,13 +102,12 @@ io.on('connection', (socket) => {
       socket.join(canvasId);
       logger.info(`User ${socket.user.email} joined canvas ${canvasId}`);
 
-      // Send initial canvas data
       socket.emit('canvasLoaded', {
         id: canvas._id,
         name: canvas.name,
         canvasElements: canvas.canvasElements.map(element => ({
           ...element,
-          type: element.type 
+          type: element.type
         })),
         owner: canvas.owner,
         sharedWith: canvas.sharedWith,
@@ -94,7 +115,6 @@ io.on('connection', (socket) => {
         updatedAt: canvas.updatedAt
       });
 
-      // Notify others
       socket.to(canvasId).emit('userJoined', {
         userId: socket.id,
         userEmail: socket.user.email
@@ -105,13 +125,12 @@ io.on('connection', (socket) => {
     }
   });
 
-  // Handle canvas updates
+  // Canvas updates
   socket.on('updateCanvas', async ({ canvasId, canvasElements }) => {
     try {
       const canvas = await Canvas.findById(canvasId);
       if (!canvas) throw new Error('Canvas not found');
   
-      // Replace with new elements (assuming full state is sent)
       canvas.canvasElements = canvasElements;
       canvas.updatedAt = new Date();
       canvas.lastUpdatedBy = socket.user.email;
@@ -128,12 +147,12 @@ io.on('connection', (socket) => {
     }
   });
 
-  // Handle disconnection
   socket.on('disconnect', () => {
     logger.info(`Client disconnected: ${socket.id}`);
   });
 });
 
+// Start server
 const PORT = process.env.PORT || 3030;
 server.listen(PORT, () => {
   logger.info(`Server running on port ${PORT}`);
