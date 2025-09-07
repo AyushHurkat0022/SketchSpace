@@ -95,7 +95,10 @@ const CanvasPage = () => {
     socketRef.current.on("connect", () => {
       console.log(`Connected to WebSocket server with socket ID: ${socketRef.current.id}`);
       console.log(`Joining canvas ${canvasid} as user ${userEmail}`);
-      socketRef.current.emit("joinCanvas", canvasid,);
+      socketRef.current.emit("joinCanvas", { // Changed to match backend event name
+        canvasId: canvasid,
+        userEmail: userEmail,
+      });
     });
 
     socketRef.current.on("disconnect", (reason) => {
@@ -117,7 +120,7 @@ const CanvasPage = () => {
     });
 
     socketRef.current.on("userJoined", (data) => { // Changed to match backend event name
-      console.log(`User ${data.userEmail} joined the canvas`);
+      console.log(`User ${data.userEmail} joined the canvas ${data.canvasId}`);
     });
 
     socketRef.current.on("user left", (data) => {
