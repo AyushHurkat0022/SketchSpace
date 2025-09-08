@@ -18,7 +18,7 @@ import { TOOL_ITEMS } from "../../constants";
 import boardContext from "../../store/board-context";
 import CollaborationPanel from "../colab/page";
 
-const Toolbar = () => {
+const Toolbar = ({ onShare, canvasid, userEmail }) => {
   const { activeToolItem, changeToolHandler, undo, redo } = useContext(boardContext);
   const [isCollabOpen, setIsCollabOpen] = useState(false);
 
@@ -31,10 +31,6 @@ const Toolbar = () => {
       anchor.download = "board.png";
       anchor.click();
     }
-  };
-
-  const handleColab = () => {
-    setIsCollabOpen(true);
   };
 
   return (
@@ -98,11 +94,18 @@ const Toolbar = () => {
         <div className={classes.toolItem} onClick={handleDownloadClick} title="Download">
           <FaDownload />
         </div>
-        <div className={classes.toolItem} onClick={handleColab} title="Collaborate">
+        <div className={classes.toolItem} onClick={() => setIsCollabOpen(true)} title="Collaborate">
           <FaHandshake />
         </div>
       </div>
-      {isCollabOpen && <CollaborationPanel onClose={() => setIsCollabOpen(false)} />}
+       {isCollabOpen && (
+        <CollaborationPanel
+          onClose={() => setIsCollabOpen(false)}
+          onShare={onShare}       
+          canvasid={canvasid}      
+          userEmail={userEmail} 
+        />
+      )}
     </>
   );
 };

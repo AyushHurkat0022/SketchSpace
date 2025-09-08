@@ -13,7 +13,6 @@ export const createElement = (
   y2,
   { type, stroke, fill, size }
 ) => {
-  // Ensure uniqueId is always a string
   const uniqueId = id !== undefined ? String(id) : `${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
   const element = {
     id: uniqueId,

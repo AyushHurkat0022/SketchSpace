@@ -211,7 +211,37 @@ const CanvasPage = () => {
     <BoardProvider initialElements={canvasData?.canvasElements || []}>
       <ToolboxProvider>
         <div className="relative min-h-screen bg-gray-100">
-          <Toolbar />
+          <Toolbar
+            onShare={async (shareEmail) => {
+              console.log(`Attempting to share canvas ${canvasid} with ${shareEmail}`);
+              const token = localStorage.getItem("token");
+              try {
+                const response = await fetch(`${API_URL}/canvases/${canvasid}/share`, {
+                  method: "POST",
+                  headers: {
+                    "Content-Type": "application/json",
+                    Authorization: `Bearer ${token}`,
+                  },
+                  body: JSON.stringify({ shareWithEmail: shareEmail, ownerEmail: userEmail }),
+                });
+
+                if (!response.ok) {
+                  const err = await response.json();
+                  console.error("Failed to share:", err);
+                  return { success: false };
+                }
+
+                console.log(`✅ Successfully shared canvas ${canvasid} with ${shareEmail}`);
+                fetchCanvas();
+                return { success: true }; // tell CollaborationPanel it worked
+              } catch (error) {
+                console.error("Error sharing canvas:", error);
+                return { success: false };
+              }
+            }}
+            canvasid={canvasid}
+            userEmail={userEmail}
+          />
           {/* Hamburger Menu */}
           <div className="absolute top-4 left-4 z-20">
             <button
