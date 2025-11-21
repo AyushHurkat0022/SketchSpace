@@ -21,6 +21,19 @@ const CanvasPage = () => {
   const socketRef = useRef(null);
   const API_URL = process.env.REACT_APP_API_URL || "http://localhost:3030";
 
+  // Prevent scrolling on the page
+  useEffect(() => {
+    document.body.style.overflow = 'hidden';
+    document.body.style.margin = '0';
+    document.body.style.padding = '0';
+    document.documentElement.style.overflow = 'hidden';
+    
+    return () => {
+      document.body.style.overflow = 'auto';
+      document.documentElement.style.overflow = 'auto';
+    };
+  }, []);
+
   useEffect(() => {
     console.log(`CanvasPage component initialized for canvas ID: ${canvasid}`);
     return () => {
@@ -59,7 +72,6 @@ const CanvasPage = () => {
         headers: { Authorization: `Bearer ${token}` },
       });
 
-
       if (!response.ok) {
         const errorText = await response.text();
         console.error(`Failed to fetch canvases: ${response.status} - ${errorText}`);
@@ -91,11 +103,10 @@ const CanvasPage = () => {
       auth: { token: localStorage.getItem("token") },
     });
 
-
     socketRef.current.on("connect", () => {
       console.log(`Connected to WebSocket server with socket ID: ${socketRef.current.id}`);
       console.log(`Joining canvas ${canvasid} as user ${userEmail}`);
-      socketRef.current.emit("joinCanvas", { // Changed to match backend event name
+      socketRef.current.emit("joinCanvas", {
         canvasId: canvasid,
         userEmail: userEmail,
       });
@@ -119,7 +130,7 @@ const CanvasPage = () => {
       }));
     });
 
-    socketRef.current.on("userJoined", (data) => { // Changed to match backend event name
+    socketRef.current.on("userJoined", (data) => {
       console.log(`User ${data.userEmail} joined the canvas ${data.canvasId}`);
     });
 
@@ -210,7 +221,7 @@ const CanvasPage = () => {
   return (
     <BoardProvider initialElements={canvasData?.canvasElements || []}>
       <ToolboxProvider>
-        <div className="relative min-h-screen bg-gray-100">
+        <div className="fixed inset-0 w-screen h-screen overflow-hidden bg-gray-100">
           <Toolbar
             onShare={async (shareEmail) => {
               console.log(`Attempting to share canvas ${canvasid} with ${shareEmail}`);
@@ -233,7 +244,7 @@ const CanvasPage = () => {
 
                 console.log(`✅ Successfully shared canvas ${canvasid} with ${shareEmail}`);
                 fetchCanvas();
-                return { success: true }; // tell CollaborationPanel it worked
+                return { success: true };
               } catch (error) {
                 console.error("Error sharing canvas:", error);
                 return { success: false };
@@ -249,14 +260,14 @@ const CanvasPage = () => {
                 console.log(`Toggling menu to ${!isMenuOpen}`);
                 setIsMenuOpen(!isMenuOpen);
               }}
-              className="p-2 bg-white rounded-full shadow-md"
+              className="p-2 bg-white rounded-full shadow-md hover:shadow-lg transition-shadow"
             >
               {isMenuOpen ? <X size={24} /> : <Menu size={24} />}
             </button>
             {isMenuOpen && canvasData && (
               <div className="absolute top-12 left-0 w-64 bg-white rounded-lg shadow-xl p-4">
                 <h3 className="font-semibold text-gray-800 mb-2">Shared With:</h3>
-                <ul className="text-sm text-gray-600">
+                <ul className="text-sm text-gray-600 max-h-60 overflow-y-auto">
                   {canvasData.canvasSharedWith.length > 0 ? (
                     canvasData.canvasSharedWith.map((email, index) => (
                       <li key={index} className="py-1">
@@ -317,7 +328,9 @@ const CanvasPage = () => {
           </div>
 
           {loading ? (
-            <div className="flex items-center justify-center h-screen">Loading...</div>
+            <div className="flex items-center justify-center h-full">
+              <div className="text-lg text-gray-600">Loading...</div>
+            </div>
           ) : canvasData ? (
             <Board
               canvasId={canvasid}
@@ -326,7 +339,9 @@ const CanvasPage = () => {
               socket={socketRef.current}
             />
           ) : (
-            <div className="flex items-center justify-center h-screen">Canvas not found</div>
+            <div className="flex items-center justify-center h-full">
+              <div className="text-lg text-gray-600">Canvas not found</div>
+            </div>
           )}
           <Toolbox />
         </div>

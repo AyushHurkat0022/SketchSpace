@@ -1,74 +1,74 @@
 .container {
-  @apply absolute top-1/2 left-5 text-sm border border-gray-400 bg-white;
+  position: absolute;
+  top: 50%;
+  left: 16px;
   transform: translateY(-50%);
-  box-shadow: 1px 0 10px rgba(0, 0, 0, 0.2);
+  width: 220px;
+  padding: 12px;
+  border-radius: 8px;
+  background: rgba(255,255,255,0.98);
+  box-shadow: 0 6px 20px rgba(0,0,0,0.12);
+  border: 1px solid rgba(0,0,0,0.06);
+  font-size: 14px;
+  z-index: 12;
 }
 
 .toolboxHeader {
-  @apply flex justify-end pt-2 pr-2;
-  height: 24px;
-}
-
-.minimizeButton {
-  @apply w-6 h-6 flex items-center justify-center text-base border border-gray-300 rounded;
-  cursor: pointer;
-  background-color: #f5f5f5;
-}
-
-.paletteButton {
-  @apply absolute top-1/2 left-5 text-2xl cursor-pointer flex items-center justify-center p-2 rounded-full;
-  transform: translateY(-50%);
-  background: none;
-  border: none;
-  font-size: 24px;
-  transition: transform 0.2s ease;
-  z-index: 10;
-}
-
-.paletteButton:hover {
-  transform: translateY(-50%) scale(1.1);
+  display: none; /* removed minimize button */
 }
 
 .selectOptionContainer {
-  @apply mb-6 last:mb-0 first:pt-5 last:pb-5 px-4;
+  margin-bottom: 12px;
+  padding: 6px 0;
 }
 
 .toolBoxLabel {
-  @apply block mb-1;
+  display: block;
+  margin-bottom: 6px;
+  font-weight: 600;
+  color: #374151;
 }
 
 .colorsContainer {
-  @apply flex flex-wrap items-center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
 }
 
 .colorBox {
-  @apply inline-block w-5 h-5 rounded mr-1 last:mr-0;
+  width: 26px;
+  height: 26px;
+  border-radius: 4px;
+  cursor: pointer;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.06);
+  border: 1px solid rgba(0,0,0,0.06);
 }
 
 .noFillColorBox {
-  background: linear-gradient(
-      to top left,
-      rgba(255, 0, 0, 0) 0%,
-      rgba(255, 0, 0, 0) calc(50% - 0.8px),
-      rgba(255, 0, 0, 1) 50%,
-      rgba(255, 0, 0, 0) calc(50% + 0.8px),
-      rgba(255, 0, 0, 0) 100%
-    ),
-    linear-gradient(
-      to top right,
-      rgba(255, 0, 0, 0) 0%,
-      rgba(255, 0, 0, 0) calc(50% - 0.8px),
-      rgba(255, 0, 0, 1) 50%,
-      rgba(255, 0, 0, 0) calc(50% + 0.8px),
-      rgba(255, 0, 0, 0) 100%
-    );
+  width: 26px;
+  height: 26px;
+  border-radius: 4px;
+  background-image:
+    linear-gradient(45deg, #ddd 25%, transparent 25%),
+    linear-gradient(-45deg, #ddd 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, #fff 75%),
+    linear-gradient(-45deg, transparent 75%, #fff 75%);
+  background-size: 8px 8px;
+  background-position: 0 0, 0 0, 0 0, 0 0;
+  cursor: pointer;
+  border: 1px solid rgba(0,0,0,0.06);
 }
 
 .activeColorBox {
-  @apply border border-gray-300;
-  box-shadow: 0 0 0 1px #4a47b1;
+  outline: 2px solid #4f46e5;
+  outline-offset: 1px;
 }
 
 .colorPicker {
-  @apply mr-5 w-10 h-10 rounded border-2 border-neutral-400;
+  width: 36px;
+  height: 36px;
+  border-radius: 6px;
+  border: 1px solid rgba(0,0,0,0.06);
+  padding: 2px;
 }

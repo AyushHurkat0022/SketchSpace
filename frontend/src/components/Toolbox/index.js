@@ -25,6 +25,11 @@ const Toolbox = () => {
     setIsMinimized(!isMinimized);
   };
 
+  // Hide toolbox completely when eraser is active
+  if (activeToolItem === TOOL_ITEMS.ERASER) {
+    return null;
+  }
+
   if (isMinimized) {
     return (
       <button 

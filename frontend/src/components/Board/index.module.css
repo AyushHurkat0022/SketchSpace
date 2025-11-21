@@ -1,17 +1,64 @@
+.canvas {
+  background-color: white;
+  display: block;
+  cursor: crosshair;
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+}
+
+.canvas.eraser {
+  cursor: pointer;
+}
+
+.canvas.text {
+  cursor: text;
+}
+
 .textElementBox {
   position: fixed;
-  border: none;
+  border: 1px dashed #999;
   background: transparent;
   resize: none;
   outline: none;
-  padding: 0;
+  padding: 4px;
   margin: 0;
-  width: auto;
-  height: auto;
+  min-width: 100px;
+  min-height: 30px;
   overflow: hidden;
   font-size: inherit;
-  font-family: inherit;
+  font-family: "Caveat", cursive;
   color: inherit;
-  line-height: inherit;
-  font-family: "Caveat";
+  line-height: 1.2;
+  z-index: 1000;
+}
+
+.saveButton {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  background-color: #3b82f6;
+  color: white;
+  padding: 12px 24px;
+  border: none;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  transition: all 0.2s ease;
+  z-index: 10;
+}
+
+.saveButton:hover {
+  background-color: #2563eb;
+  transform: translateY(-2px);
+  box-shadow: 0 6px 8px rgba(0, 0, 0, 0.15);
+}
+
+.saveButton:active {
+  transform: translateY(0);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }

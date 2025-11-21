@@ -82,6 +82,7 @@ const boardReducer = (state, action) => {
     }
     case BOARD_ACTIONS.DRAW_UP: {
       const elementsCopy = [...state.elements];
+      // Remove any history after current index (for redo scenarios)
       const newHistory = state.history.slice(0, state.index + 1);
       newHistory.push(elementsCopy);
       return {
@@ -96,11 +97,21 @@ const boardReducer = (state, action) => {
       newElements = newElements.filter((element) => {
         return !isPointNearElement(element, clientX, clientY);
       });
-      const newHistory = state.history.slice(0, state.index + 1);
-      newHistory.push(newElements);
+      
+      // Don't update history during erasing, only update elements
       return {
         ...state,
         elements: newElements,
+      };
+    }
+    case BOARD_ACTIONS.ERASE_COMPLETE: {
+      // Update history when erasing is complete
+      const elementsCopy = [...state.elements];
+      const newHistory = state.history.slice(0, state.index + 1);
+      newHistory.push(elementsCopy);
+      
+      return {
+        ...state,
         history: newHistory,
         index: state.index + 1,
       };
@@ -109,8 +120,11 @@ const boardReducer = (state, action) => {
       const index = state.elements.length - 1;
       const newElements = [...state.elements];
       newElements[index].text = action.payload.text;
+      
+      // Remove any history after current index
       const newHistory = state.history.slice(0, state.index + 1);
       newHistory.push(newElements);
+      
       return {
         ...state,
         toolActionType: TOOL_ACTION_TYPES.NONE,
@@ -121,18 +135,32 @@ const boardReducer = (state, action) => {
     }
     case BOARD_ACTIONS.UNDO: {
       if (state.index <= 0) return state;
+      
+      const newIndex = state.index - 1;
+      const newElements = state.history[newIndex];
+      
+      console.log(`Undo: Moving from index ${state.index} to ${newIndex}`);
+      console.log(`Elements count: ${newElements.length}`);
+      
       return {
         ...state,
-        elements: state.history[state.index - 1],
-        index: state.index - 1,
+        elements: newElements,
+        index: newIndex,
       };
     }
     case BOARD_ACTIONS.REDO: {
       if (state.index >= state.history.length - 1) return state;
+      
+      const newIndex = state.index + 1;
+      const newElements = state.history[newIndex];
+      
+      console.log(`Redo: Moving from index ${state.index} to ${newIndex}`);
+      console.log(`Elements count: ${newElements.length}`);
+      
       return {
         ...state,
-        elements: state.history[state.index + 1],
-        index: state.index + 1,
+        elements: newElements,
+        index: newIndex,
       };
     }
     case BOARD_ACTIONS.SET_ELEMENTS: {
@@ -246,6 +274,11 @@ const BoardProvider = ({ children, initialElements = [] }) => {
       dispatchBoardAction({
         type: BOARD_ACTIONS.DRAW_UP,
       });
+    } else if (boardState.toolActionType === TOOL_ACTION_TYPES.ERASING) {
+      // Complete the erase action and update history
+      dispatchBoardAction({
+        type: BOARD_ACTIONS.ERASE_COMPLETE,
+      });
     }
     dispatchBoardAction({
       type: BOARD_ACTIONS.CHANGE_ACTION_TYPE,
@@ -265,16 +298,18 @@ const BoardProvider = ({ children, initialElements = [] }) => {
   };
 
   const boardUndoHandler = useCallback(() => {
+    console.log(`Undo clicked. Current index: ${boardState.index}, History length: ${boardState.history.length}`);
     dispatchBoardAction({
       type: BOARD_ACTIONS.UNDO,
     });
-  }, []);
+  }, [boardState.index, boardState.history.length]);
 
   const boardRedoHandler = useCallback(() => {
+    console.log(`Redo clicked. Current index: ${boardState.index}, History length: ${boardState.history.length}`);
     dispatchBoardAction({
       type: BOARD_ACTIONS.REDO,
     });
-  }, []);
+  }, [boardState.index, boardState.history.length]);
 
   const boardContextValue = {
     activeToolItem: boardState.activeToolItem,

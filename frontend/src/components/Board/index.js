@@ -5,6 +5,7 @@ import { TOOL_ACTION_TYPES, TOOL_ITEMS } from "../../constants";
 import toolboxContext from "../../store/toolbox-context";
 import { updateCanvas } from "../../utils/api";
 import classes from "./index.module.css";
+import cx from "classnames";
 
 function Board({ canvasId, userEmail, initialElements = [], socket }) {
   const canvasRef = useRef();
@@ -12,6 +13,7 @@ function Board({ canvasId, userEmail, initialElements = [], socket }) {
   const {
     elements,
     toolActionType,
+    activeToolItem,
     boardMouseDownHandler,
     boardMouseMoveHandler,
     boardMouseUpHandler,
@@ -23,8 +25,17 @@ function Board({ canvasId, userEmail, initialElements = [], socket }) {
 
   useEffect(() => {
     const canvas = canvasRef.current;
-    canvas.width = window.innerWidth;
-    canvas.height = window.innerHeight;
+    const resizeCanvas = () => {
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+    };
+    
+    resizeCanvas();
+    window.addEventListener('resize', resizeCanvas);
+    
+    return () => {
+      window.removeEventListener('resize', resizeCanvas);
+    };
   }, []);
 
   useEffect(() => {
@@ -70,6 +81,10 @@ function Board({ canvasId, userEmail, initialElements = [], socket }) {
   useLayoutEffect(() => {
     const canvas = canvasRef.current;
     const context = canvas.getContext("2d");
+    
+    // Clear and fill with white background
+    context.fillStyle = 'white';
+    context.fillRect(0, 0, canvas.width, canvas.height);
     context.save();
   
     const roughCanvas = rough.canvas(canvas);
@@ -116,8 +131,12 @@ function Board({ canvasId, userEmail, initialElements = [], socket }) {
   useEffect(() => {
     const textarea = textAreaRef.current;
     if (toolActionType === TOOL_ACTION_TYPES.WRITING) {
+      console.log("Writing mode activated, focusing textarea");
       setTimeout(() => {
-        textarea.focus();
+        if (textarea) {
+          textarea.focus();
+          textarea.select();
+        }
       }, 0);
     }
   }, [toolActionType]);
@@ -128,7 +147,7 @@ function Board({ canvasId, userEmail, initialElements = [], socket }) {
 
   const handleTextBlur = (text) => {
     textAreaBlurHandler(text);
-    saveCanvas(); // Save immediately after text input is complete
+    saveCanvas();
   };
 
   return (
@@ -150,7 +169,11 @@ function Board({ canvasId, userEmail, initialElements = [], socket }) {
       <canvas
         ref={canvasRef}
         id="canvas"
-        onMouseDown={(event) => boardMouseDownHandler(event, toolboxState)} // Use directly, no need for handleMouseDown
+        className={cx(classes.canvas, {
+          [classes.eraser]: activeToolItem === TOOL_ITEMS.ERASER,
+          [classes.text]: activeToolItem === TOOL_ITEMS.TEXT,
+        })}
+        onMouseDown={(event) => boardMouseDownHandler(event, toolboxState)}
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
       />
