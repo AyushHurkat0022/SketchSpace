@@ -1,4 +1,4 @@
-import { useContext, useEffect, useLayoutEffect, useRef } from "react";
+import { useContext, useEffect, useLayoutEffect, useRef, useCallback } from "react";
 import rough from "roughjs";
 import boardContext from "../../store/board-context";
 import { TOOL_ACTION_TYPES, TOOL_ITEMS } from "../../constants";
@@ -10,6 +10,10 @@ import cx from "classnames";
 function Board({ canvasId, userEmail, initialElements = [], socket }) {
   const canvasRef = useRef();
   const textAreaRef = useRef();
+  const isSavingRef = useRef(false);
+  const lastSaveTimeRef = useRef(0);
+  const saveTimeoutRef = useRef(null);
+  
   const {
     elements,
     toolActionType,
@@ -41,8 +45,10 @@ function Board({ canvasId, userEmail, initialElements = [], socket }) {
   useEffect(() => {
     function handleKeyDown(event) {
       if (event.ctrlKey && event.key === "z") {
+        event.preventDefault();
         undo();
       } else if (event.ctrlKey && event.key === "y") {
+        event.preventDefault();
         redo();
       }
     }
@@ -54,11 +60,31 @@ function Board({ canvasId, userEmail, initialElements = [], socket }) {
     };
   }, [undo, redo]);
 
-  // Save function
-  const saveCanvas = async () => {
+  // Debounced save function to prevent rapid API calls
+  const saveCanvas = useCallback(async (skipWebSocket = false) => {
+    // Prevent multiple simultaneous saves
+    if (isSavingRef.current) {
+      console.log("Save already in progress, skipping...");
+      return;
+    }
+
+    // Debounce: don't save more than once per second
+    const now = Date.now();
+    if (now - lastSaveTimeRef.current < 1000) {
+      console.log("Save debounced, too soon since last save");
+      return;
+    }
+
+    isSavingRef.current = true;
+    lastSaveTimeRef.current = now;
+
     try {
+      console.log(`Saving canvas ${canvasId} with ${elements.length} elements`);
       await updateCanvas(canvasId, userEmail, elements);
-      if (socket) {
+      
+      // Only emit to WebSocket if this is a local change (not from incoming WebSocket update)
+      if (!skipWebSocket && socket) {
+        console.log("Emitting canvas update to other users");
         socket.emit('updateCanvas', {
           canvasId,
           canvasElements: elements
@@ -66,17 +92,37 @@ function Board({ canvasId, userEmail, initialElements = [], socket }) {
       }
     } catch (error) {
       console.error("Failed to save canvas:", error);
+    } finally {
+      isSavingRef.current = false;
     }
-  };
+  }, [canvasId, userEmail, elements, socket]);
 
-  // Handle save after drawing ends
-  const handleMouseUp = () => {
+  // Handle mouse up - save with debounce
+  const handleMouseUp = useCallback(() => {
     boardMouseUpHandler();
+    
     if (toolActionType === TOOL_ACTION_TYPES.DRAWING || 
         toolActionType === TOOL_ACTION_TYPES.ERASING) {
-      saveCanvas();
+      // Clear any pending save timeout
+      if (saveTimeoutRef.current) {
+        clearTimeout(saveTimeoutRef.current);
+      }
+      
+      // Schedule save after 500ms of inactivity
+      saveTimeoutRef.current = setTimeout(() => {
+        saveCanvas();
+      }, 500);
     }
-  };
+  }, [boardMouseUpHandler, toolActionType, saveCanvas]);
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (saveTimeoutRef.current) {
+        clearTimeout(saveTimeoutRef.current);
+      }
+    };
+  }, []);
 
   useLayoutEffect(() => {
     const canvas = canvasRef.current;
@@ -89,38 +135,36 @@ function Board({ canvasId, userEmail, initialElements = [], socket }) {
   
     const roughCanvas = rough.canvas(canvas);
   
-    console.group("Canvas Render - Elements");
-    elements.forEach((element, index) => {
-      console.groupCollapsed(`Element ${index} [${element.type}]`);
-      console.log("Element details:", element);
-  
-      switch (element.type) {
-        case TOOL_ITEMS.LINE:
-        case TOOL_ITEMS.RECTANGLE:
-        case TOOL_ITEMS.CIRCLE:
-        case TOOL_ITEMS.ARROW:
-          roughCanvas.draw(element.roughEle);
-          console.log("Drawn using rough.js:", element.roughEle);
-          break;
-        case TOOL_ITEMS.BRUSH:
-          context.fillStyle = element.stroke;
-          context.fill(element.path);
-          console.log("Drawn using brush path.");
-          break;
-        case TOOL_ITEMS.TEXT:
-          context.textBaseline = "top";
-          context.font = `${element.size}px Caveat`;
-          context.fillStyle = element.stroke;
-          context.fillText(element.text, element.x1, element.y1);
-          console.log("Text drawn:", element.text);
-          break;
-        default:
-          console.warn("Unknown element type:", element.type);
+    elements.forEach((element) => {
+      try {
+        switch (element.type) {
+          case TOOL_ITEMS.LINE:
+          case TOOL_ITEMS.RECTANGLE:
+          case TOOL_ITEMS.CIRCLE:
+          case TOOL_ITEMS.ARROW:
+            if (element.roughEle) {
+              roughCanvas.draw(element.roughEle);
+            }
+            break;
+          case TOOL_ITEMS.BRUSH:
+            if (element.path && element.stroke) {
+              context.fillStyle = element.stroke;
+              context.fill(element.path);
+            }
+            break;
+          case TOOL_ITEMS.TEXT:
+            context.textBaseline = "top";
+            context.font = `${element.size || 20}px Caveat`;
+            context.fillStyle = element.stroke || "#000000";
+            context.fillText(element.text || "", element.x1, element.y1);
+            break;
+          default:
+            console.warn("Unknown element type:", element.type);
+        }
+      } catch (error) {
+        console.error("Error rendering element:", element, error);
       }
-  
-      console.groupEnd();
     });
-    console.groupEnd();
   
     return () => {
       context.clearRect(0, 0, canvas.width, canvas.height);
@@ -131,7 +175,6 @@ function Board({ canvasId, userEmail, initialElements = [], socket }) {
   useEffect(() => {
     const textarea = textAreaRef.current;
     if (toolActionType === TOOL_ACTION_TYPES.WRITING) {
-      console.log("Writing mode activated, focusing textarea");
       setTimeout(() => {
         if (textarea) {
           textarea.focus();
@@ -147,6 +190,15 @@ function Board({ canvasId, userEmail, initialElements = [], socket }) {
 
   const handleTextBlur = (text) => {
     textAreaBlurHandler(text);
+    // Save after text is added
+    setTimeout(() => {
+      saveCanvas();
+    }, 100);
+  };
+
+  // Manual save button
+  const handleManualSave = () => {
+    console.log("Manual save triggered");
     saveCanvas();
   };
 
@@ -158,10 +210,10 @@ function Board({ canvasId, userEmail, initialElements = [], socket }) {
           ref={textAreaRef}
           className={classes.textElementBox}
           style={{
-            top: elements[elements.length - 1].y1,
-            left: elements[elements.length - 1].x1,
-            fontSize: `${elements[elements.length - 1]?.size}px`,
-            color: elements[elements.length - 1]?.stroke,
+            top: elements[elements.length - 1]?.y1 || 0,
+            left: elements[elements.length - 1]?.x1 || 0,
+            fontSize: `${elements[elements.length - 1]?.size || 20}px`,
+            color: elements[elements.length - 1]?.stroke || "#000000",
           }}
           onBlur={(event) => handleTextBlur(event.target.value)}
         />
@@ -178,10 +230,11 @@ function Board({ canvasId, userEmail, initialElements = [], socket }) {
         onMouseUp={handleMouseUp}
       />
       <button
-        onClick={saveCanvas}
+        onClick={handleManualSave}
         className={classes.saveButton}
+        disabled={isSavingRef.current}
       >
-        Save
+        {isSavingRef.current ? "Saving..." : "Save"}
       </button>
     </>
   );

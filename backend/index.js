@@ -18,14 +18,14 @@ const server = http.createServer(app);
 
 // Allowed origins for CORS
 const allowedOrigins = [
-  'https://sketchspace.onrender.com', // live frontend
-  'http://localhost:3000'             // local dev frontend
+  'https://sketchspace.onrender.com',
+  'http://localhost:3000'
 ];
 
 // Middleware
 app.use(cors({
   origin: function (origin, callback) {
-    if (!origin) return callback(null, true); // allow requests with no origin
+    if (!origin) return callback(null, true);
     if (allowedOrigins.indexOf(origin) === -1) {
       const msg = `The CORS policy for this site does not allow access from the specified Origin: ${origin}`;
       return callback(new Error(msg), false);
@@ -106,30 +106,32 @@ io.on('connection', (socket) => {
   // Join canvas room
   socket.on('joinCanvas', async (canvasId) => {
     try {
+      // FIXED: Use correct field names from Canvas model
       const canvas = await Canvas.findOne({
         _id: canvasId,
         $or: [
-          { owner: socket.user.id },
-          { sharedWith: socket.user.email }
+          { email: socket.user.email },              // Changed from 'owner'
+          { canvasSharedWith: socket.user.email }    // Changed from 'sharedWith'
         ]
       });
 
-      if (!canvas) throw new Error('Canvas not found');
+      if (!canvas) {
+        throw new Error('Canvas not found or access denied');
+      }
 
       socket.join(canvasId);
       logger.info(`User ${socket.user.email} joined canvas ${canvasId}`);
 
+      // FIXED: Send correct field names
       socket.emit('canvasLoaded', {
         id: canvas._id,
         name: canvas.name,
-        canvasElements: canvas.canvasElements.map(element => ({
-          ...element,
-          type: element.type
-        })),
-        owner: canvas.owner,
-        sharedWith: canvas.sharedWith,
+        canvasElements: canvas.canvasElements,
+        email: canvas.email,                        // Changed from 'owner'
+        canvasSharedWith: canvas.canvasSharedWith,  // Changed from 'sharedWith'
         createdAt: canvas.createdAt,
-        updatedAt: canvas.updatedAt
+        updatedAt: canvas.updatedAt,
+        lastUpdatedBy: canvas.lastUpdatedBy
       });
 
       socket.to(canvasId).emit('userJoined', {
@@ -145,8 +147,17 @@ io.on('connection', (socket) => {
   // Canvas updates
   socket.on('updateCanvas', async ({ canvasId, canvasElements }) => {
     try {
-      const canvas = await Canvas.findById(canvasId);
-      if (!canvas) throw new Error('Canvas not found');
+      const canvas = await Canvas.findOne({
+        _id: canvasId,
+        $or: [
+          { email: socket.user.email },
+          { canvasSharedWith: socket.user.email }
+        ]
+      });
+
+      if (!canvas) {
+        throw new Error('Canvas not found or access denied');
+      }
   
       canvas.canvasElements = canvasElements;
       canvas.updatedAt = new Date();
@@ -154,14 +165,28 @@ io.on('connection', (socket) => {
   
       const updatedCanvas = await canvas.save();
   
+      // Broadcast to all users in the room including sender
       io.to(canvasId).emit('canvasUpdated', {
         canvasElements: updatedCanvas.canvasElements,
         updatedBy: socket.user.email,
         timestamp: updatedCanvas.updatedAt
       });
+
+      logger.info(`Canvas ${canvasId} updated by ${socket.user.email}`);
     } catch (error) {
       logger.error(`Canvas update error: ${error.message}`);
+      socket.emit('canvasError', error.message);
     }
+  });
+
+  // Handle user leaving canvas room
+  socket.on('leaveCanvas', (canvasId) => {
+    socket.leave(canvasId);
+    socket.to(canvasId).emit('userLeft', {
+      userId: socket.id,
+      userEmail: socket.user.email
+    });
+    logger.info(`User ${socket.user.email} left canvas ${canvasId}`);
   });
 
   socket.on('disconnect', () => {
