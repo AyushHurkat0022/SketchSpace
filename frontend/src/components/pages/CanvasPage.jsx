@@ -8,15 +8,17 @@ import BoardProvider from "../../store/BoardProvider";
 import ToolboxProvider from "../../store/ToolboxProvider";
 import { jwtDecode } from "jwt-decode";
 import { Menu, X } from "lucide-react";
+import CollaborationPanel from "../colab/page";
 
 const CanvasPage = () => {
   const { canvasid } = useParams();
   const navigate = useNavigate();
   const [canvasData, setCanvasData] = useState(null);
   const [userEmail, setUserEmail] = useState("");
-  const [shareEmail, setShareEmail] = useState("");
   const [loading, setLoading] = useState(true);
+  const [shareEmail, setShareEmail] = useState("");
   const [isSharePopupOpen, setIsSharePopupOpen] = useState(false);
+  const [isCollabPanelOpen, setIsCollabPanelOpen] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const socketRef = useRef(null);
   const [socketInstance, setSocketInstance] = useState(null);
@@ -173,9 +175,13 @@ const CanvasPage = () => {
     };
   }, [userEmail, fetchCanvas, setupWebSocket]);
 
-  // Handle sharing the canvas
-  const handleShare = useCallback(async () => {
-    console.log(`Attempting to share canvas with ${shareEmail}`);
+  // Shared share handler used by both popup + collaboration panel
+  const shareCanvasWithEmail = useCallback(async (shareWithEmail) => {
+    if (!shareWithEmail) {
+      console.warn("Share email missing");
+      return { success: false };
+    }
+    console.log(`Attempting to share canvas ${canvasid} with ${shareWithEmail}`);
     const token = localStorage.getItem("token");
     try {
       const response = await fetch(`${API_URL}/canvases/${canvasid}/share`, {
@@ -184,7 +190,7 @@ const CanvasPage = () => {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ shareWithEmail: shareEmail, ownerEmail: userEmail }),
+        body: JSON.stringify({ shareWithEmail, ownerEmail: userEmail }),
       });
 
       if (!response.ok) {
@@ -192,14 +198,22 @@ const CanvasPage = () => {
         throw new Error("Failed to share canvas");
       }
 
-      console.log(`Successfully shared canvas with ${shareEmail}`);
-      setShareEmail("");
-      setIsSharePopupOpen(false);
+      console.log(`Successfully shared canvas with ${shareWithEmail}`);
       fetchCanvas();
+      return { success: true };
     } catch (error) {
       console.error("Error sharing canvas:", error);
+      return { success: false };
     }
-  }, [canvasid, shareEmail, userEmail, fetchCanvas, API_URL]);
+  }, [canvasid, userEmail, fetchCanvas, API_URL]);
+
+  const handleShareButtonSubmit = useCallback(async () => {
+    const result = await shareCanvasWithEmail(shareEmail);
+    if (result.success) {
+      setShareEmail("");
+      setIsSharePopupOpen(false);
+    }
+  }, [shareEmail, shareCanvasWithEmail]);
 
   // Log when canvas data changes
   useEffect(() => {
@@ -213,45 +227,27 @@ const CanvasPage = () => {
     console.log(`Share popup is now ${isSharePopupOpen ? 'open' : 'closed'}`);
   }, [isSharePopupOpen]);
 
+  useEffect(() => {
+    console.log(`Collaboration panel is now ${isCollabPanelOpen ? 'open' : 'closed'}`);
+  }, [isCollabPanelOpen]);
+
   // Log when menu state changes
   useEffect(() => {
     console.log(`Menu is now ${isMenuOpen ? 'open' : 'closed'}`);
   }, [isMenuOpen]);
 
   return (
-    <BoardProvider initialElements={canvasData?.canvasElements || []}>
+    <BoardProvider
+      canvasId={canvasid}
+      initialElements={canvasData?.canvasElements || []}
+    >
       <ToolboxProvider>
         <div className="fixed inset-0 w-screen h-screen overflow-hidden bg-gray-100">
           <Toolbar
-            onShare={async (shareEmail) => {
-              console.log(`Attempting to share canvas ${canvasid} with ${shareEmail}`);
-              const token = localStorage.getItem("token");
-              try {
-                const response = await fetch(`${API_URL}/canvases/${canvasid}/share`, {
-                  method: "POST",
-                  headers: {
-                    "Content-Type": "application/json",
-                    Authorization: `Bearer ${token}`,
-                  },
-                  body: JSON.stringify({ shareWithEmail: shareEmail, ownerEmail: userEmail }),
-                });
-
-                if (!response.ok) {
-                  const err = await response.json();
-                  console.error("Failed to share:", err);
-                  return { success: false };
-                }
-
-                console.log(`✅ Successfully shared canvas ${canvasid} with ${shareEmail}`);
-                fetchCanvas();
-                return { success: true };
-              } catch (error) {
-                console.error("Error sharing canvas:", error);
-                return { success: false };
-              }
+            onOpenCollaborate={() => {
+              console.log("Opening collaboration panel from toolbar");
+              setIsCollabPanelOpen(true);
             }}
-            canvasid={canvasid}
-            userEmail={userEmail}
           />
           {/* Hamburger Menu */}
           <div className="absolute top-4 left-4 z-20">
@@ -318,7 +314,7 @@ const CanvasPage = () => {
                   className="w-full p-2 border rounded-md mb-4 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
                 <button
-                  onClick={handleShare}
+                  onClick={handleShareButtonSubmit}
                   className="w-full bg-blue-500 text-white py-2 rounded-md hover:bg-blue-600 transition"
                 >
                   Send Invite
@@ -345,6 +341,17 @@ const CanvasPage = () => {
           )}
           <Toolbox />
         </div>
+        {isCollabPanelOpen && (
+          <CollaborationPanel
+            onClose={() => {
+              console.log("Closing collaboration panel");
+              setIsCollabPanelOpen(false);
+            }}
+            onShare={shareCanvasWithEmail}
+            canvasid={canvasid}
+            userEmail={userEmail}
+          />
+        )}
       </ToolboxProvider>
     </BoardProvider>
   );

@@ -19,6 +19,8 @@ function Board({ canvasId, userEmail, initialElements = [], socket }) {
   const elementsRef = useRef(initialElements);
   const toolActionTypeRef = useRef(TOOL_ACTION_TYPES.NONE);
   const removedElementIdsRef = useRef(new Set());
+  const persistedElementIdsRef = useRef(new Set());
+  const historyVersionTrackerRef = useRef(0);
   
   const {
     elements,
@@ -31,6 +33,7 @@ function Board({ canvasId, userEmail, initialElements = [], socket }) {
     undo,
     redo,
     mergeElements,
+    historyVersion,
   } = useContext(boardContext);
   const { toolboxState } = useContext(toolboxContext);
 
@@ -84,6 +87,14 @@ function Board({ canvasId, userEmail, initialElements = [], socket }) {
   }, [elements]);
 
   useEffect(() => {
+    const seedIds = new Set(
+      (initialElements || []).map((element) => element?.id).filter(Boolean)
+    );
+    persistedElementIdsRef.current = seedIds;
+    removedElementIdsRef.current.clear();
+  }, [canvasId, initialElements]);
+
+  useEffect(() => {
     toolActionTypeRef.current = toolActionType;
   }, [toolActionType]);
 
@@ -105,14 +116,39 @@ function Board({ canvasId, userEmail, initialElements = [], socket }) {
     [serializeElement]
   );
 
-  // Debounced save function to prevent rapid API calls
-  const buildRemovalEntries = useCallback(() => {
-    return Array.from(removedElementIdsRef.current).map((id) => ({
+  const buildRemovalEntries = useCallback((currentIdSet) => {
+    const removalIdSet = new Set(removedElementIdsRef.current);
+    const previousIds = persistedElementIdsRef.current || new Set();
+
+    if (previousIds.size > 0) {
+      previousIds.forEach((id) => {
+        if (!currentIdSet.has(id)) {
+          removalIdSet.add(id);
+        }
+      });
+    }
+
+    return Array.from(removalIdSet).map((id) => ({
       id,
       isDeleted: true,
       updatedAt: Date.now(),
     }));
   }, []);
+
+  const getSnapshotData = useCallback(() => {
+    const serializedElements = serializeElements(elementsRef.current || []);
+    const currentIdSet = new Set(
+      serializedElements.map((element) => element?.id).filter(Boolean)
+    );
+    const removalEntries = buildRemovalEntries(currentIdSet);
+    const removalIds = removalEntries.map((entry) => entry.id);
+    return {
+      serializedElements,
+      currentIdSet,
+      removalEntries,
+      removalIds,
+    };
+  }, [serializeElements, buildRemovalEntries]);
 
   const clearRemovedElementIds = useCallback(() => {
     removedElementIdsRef.current.clear();
@@ -137,12 +173,16 @@ function Board({ canvasId, userEmail, initialElements = [], socket }) {
     lastSaveTimeRef.current = now;
 
     try {
-      const currentElements = elementsRef.current || [];
-      const serializedElements = serializeElements(currentElements);
-      const removalEntries = buildRemovalEntries();
+      const {
+        serializedElements,
+        currentIdSet,
+        removalEntries,
+        removalIds,
+      } = getSnapshotData();
       const payloadElements = [...serializedElements, ...removalEntries];
-      const removalIds = removalEntries.map((entry) => entry.id);
-      console.log(`Saving canvas ${canvasId} with ${currentElements.length} elements`);
+      console.log(
+        `Saving canvas ${canvasId} with ${serializedElements.length} elements`
+      );
 
       if (socket) {
         console.log("Emitting canvas update to other users");
@@ -158,13 +198,14 @@ function Board({ canvasId, userEmail, initialElements = [], socket }) {
         console.error("Failed to persist canvas via REST:", error);
       });
 
+      persistedElementIdsRef.current = currentIdSet;
       clearRemovedElementIds();
     } catch (error) {
       console.error("Failed to save canvas:", error);
     } finally {
       isSavingRef.current = false;
     }
-  }, [canvasId, userEmail, socket, serializeElements, buildRemovalEntries, clearRemovedElementIds]);
+  }, [canvasId, userEmail, socket, getSnapshotData, clearRemovedElementIds]);
 
   const emitStreamPayload = useCallback(
     (payload) => {
@@ -246,8 +287,10 @@ function Board({ canvasId, userEmail, initialElements = [], socket }) {
       }
     };
 
-    const handleCanvasUpdated = ({ canvasElements }) => {
-      mergeElements(canvasElements || [], { resetHistory: true });
+    const handleCanvasUpdated = ({ canvasElements, updatedBy }) => {
+      const shouldResetHistory =
+        updatedBy && updatedBy !== userEmail ? true : false;
+      mergeElements(canvasElements || [], { resetHistory: shouldResetHistory });
     };
 
     socket.on('canvasStream', handleStream);
@@ -257,7 +300,7 @@ function Board({ canvasId, userEmail, initialElements = [], socket }) {
       socket.off('canvasStream', handleStream);
       socket.off('canvasUpdated', handleCanvasUpdated);
     };
-  }, [socket, mergeElements]);
+  }, [socket, mergeElements, userEmail]);
 
   // Handle mouse up - save with debounce
   const handleMouseUp = useCallback(() => {
@@ -268,6 +311,21 @@ function Board({ canvasId, userEmail, initialElements = [], socket }) {
       saveCanvas();
     }
   }, [boardMouseUpHandler, toolActionType, saveCanvas]);
+
+  useEffect(() => {
+    if (historyVersion > historyVersionTrackerRef.current) {
+      historyVersionTrackerRef.current = historyVersion;
+      const snapshot = getSnapshotData();
+      emitStreamPayload({
+        mode: 'snapshot',
+        elements: snapshot.serializedElements,
+        removedElementIds: snapshot.removalIds,
+      });
+      saveCanvas();
+    } else {
+      historyVersionTrackerRef.current = historyVersion;
+    }
+  }, [historyVersion, saveCanvas, emitStreamPayload, getSnapshotData]);
 
   useLayoutEffect(() => {
     const canvas = canvasRef.current;

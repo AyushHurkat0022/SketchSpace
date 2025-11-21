@@ -1,4 +1,4 @@
-import React, { useState, useContext } from "react";
+import React, { useContext } from "react";
 import classes from "./index.module.css";
 import cx from "classnames";
 import {
@@ -16,11 +16,9 @@ import {
 import { LuRectangleHorizontal } from "react-icons/lu";
 import { TOOL_ITEMS } from "../../constants";
 import boardContext from "../../store/board-context";
-import CollaborationPanel from "../colab/page";
 
-const Toolbar = ({ onShare, canvasid, userEmail }) => {
+const Toolbar = ({ onOpenCollaborate }) => {
   const { activeToolItem, changeToolHandler, undo, redo } = useContext(boardContext);
-  const [isCollabOpen, setIsCollabOpen] = useState(false);
 
   const handleDownloadClick = () => {
     const canvas = document.getElementById("canvas");
@@ -94,18 +92,10 @@ const Toolbar = ({ onShare, canvasid, userEmail }) => {
         <div className={classes.toolItem} onClick={handleDownloadClick} title="Download">
           <FaDownload />
         </div>
-        <div className={classes.toolItem} onClick={() => setIsCollabOpen(true)} title="Collaborate">
+        <div className={classes.toolItem} onClick={onOpenCollaborate} title="Collaborate">
           <FaHandshake />
         </div>
       </div>
-       {isCollabOpen && (
-        <CollaborationPanel
-          onClose={() => setIsCollabOpen(false)}
-          onShare={onShare}       
-          canvasid={canvasid}      
-          userEmail={userEmail} 
-        />
-      )}
     </>
   );
 };

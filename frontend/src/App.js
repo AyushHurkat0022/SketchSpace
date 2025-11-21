@@ -3,6 +3,8 @@ import WelcomePage from "./components/pages/welcome.tsx";
 import Login from "./components/Auth/login.tsx";
 import Profile from "./components/pages/profile.jsx";
 import CanvasPage from "./components/pages/CanvasPage.jsx";
+import "./index.css";
+import "./App.css";
 
 function App() {
   return (
@@ -11,7 +13,8 @@ function App() {
         <Route path="/" element={<WelcomePage />} />
         <Route path="/auth" element={<Login />} />
         <Route path="/profile" element={<Profile />} />
-        <Route path="/canvas/:canvasid" element={<CanvasPage />} />  {/* Canvas Route */}
+        <Route path="/canvas/:canvasid" element={<CanvasPage />} />{" "}
+        {/* Canvas Route */}
       </Routes>
     </Router>
   );

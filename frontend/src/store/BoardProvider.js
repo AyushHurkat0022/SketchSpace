@@ -1,4 +1,4 @@
-import React, { useCallback, useReducer, useEffect } from "react";
+import React, { useCallback, useReducer, useEffect, useRef } from "react";
 
 import boardContext from "./board-context";
 import { BOARD_ACTIONS, TOOL_ACTION_TYPES, TOOL_ITEMS } from "../constants";
@@ -286,6 +286,7 @@ const boardReducer = (state, action) => {
         ...state,
         elements: newElements,
         index: newIndex,
+        historyVersion: (state.historyVersion || 0) + 1,
       };
     }
     case BOARD_ACTIONS.REDO: {
@@ -301,6 +302,7 @@ const boardReducer = (state, action) => {
         ...state,
         elements: newElements,
         index: newIndex,
+        historyVersion: (state.historyVersion || 0) + 1,
       };
     }
     case BOARD_ACTIONS.SET_ELEMENTS: {
@@ -312,6 +314,7 @@ const boardReducer = (state, action) => {
         elements: processedElements,
         history: resetHistory ? [processedElements] : state.history,
         index: resetHistory ? 0 : state.index,
+        historyVersion: resetHistory ? 0 : state.historyVersion,
       };
     }
     case BOARD_ACTIONS.MERGE_ELEMENTS: {
@@ -324,6 +327,7 @@ const boardReducer = (state, action) => {
         elements: mergedElements,
         history: shouldResetHistory ? [mergedElements] : state.history,
         index: shouldResetHistory ? 0 : state.index,
+        historyVersion: shouldResetHistory ? 0 : state.historyVersion,
       };
     }
     default:
@@ -331,25 +335,36 @@ const boardReducer = (state, action) => {
   }
 };
 
-const BoardProvider = ({ children, initialElements = [] }) => {
+const BoardProvider = ({ children, initialElements = [], canvasId }) => {
   const initialBoardState = {
     activeToolItem: TOOL_ITEMS.BRUSH,
     toolActionType: TOOL_ACTION_TYPES.NONE,
     elements: initialElements,
     history: [initialElements],
     index: 0,
+    historyVersion: 0,
   };
   const [boardState, dispatchBoardAction] = useReducer(
     boardReducer,
     initialBoardState
   );
 
+  const lastInitializedCanvasIdRef = useRef(null);
+  const hasInitializedRef = useRef(false);
+
   useEffect(() => {
-    dispatchBoardAction({
-      type: BOARD_ACTIONS.SET_ELEMENTS,
-      payload: { elements: initialElements },
-    });
-  }, [initialElements]);
+    const isNewCanvas = canvasId && lastInitializedCanvasIdRef.current !== canvasId;
+    const shouldInitialize = isNewCanvas || !hasInitializedRef.current;
+
+    if (shouldInitialize) {
+      hasInitializedRef.current = true;
+      lastInitializedCanvasIdRef.current = canvasId;
+      dispatchBoardAction({
+        type: BOARD_ACTIONS.SET_ELEMENTS,
+        payload: { elements: initialElements, resetHistory: true },
+      });
+    }
+  }, [canvasId, initialElements]);
 
   const setElements = (elements) => {
     dispatchBoardAction({
@@ -470,6 +485,7 @@ const BoardProvider = ({ children, initialElements = [] }) => {
     activeToolItem: boardState.activeToolItem,
     elements: boardState.elements,
     toolActionType: boardState.toolActionType,
+    historyVersion: boardState.historyVersion,
     changeToolHandler,
     boardMouseDownHandler,
     boardMouseMoveHandler,
