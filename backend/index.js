@@ -206,7 +206,7 @@ io.on('connection', (socket) => {
   });
 
   // Canvas updates
-  socket.on('updateCanvas', async ({ canvasId, canvasElements }) => {
+  socket.on('updateCanvas', async ({ canvasId, canvasElements, removedElementIds = [] }) => {
     try {
       const canvas = await Canvas.findOne({
         _id: canvasId,
@@ -220,7 +220,16 @@ io.on('connection', (socket) => {
         throw new Error('Canvas not found or access denied');
       }
   
-      const mergedElements = mergeCanvasElements(canvas.canvasElements || [], canvasElements || []);
+      const removalEntries = (removedElementIds || []).map(id => ({
+        id,
+        isDeleted: true,
+        updatedAt: new Date()
+      }));
+
+      const mergedElements = mergeCanvasElements(
+        canvas.canvasElements || [],
+        [...(canvasElements || []), ...removalEntries]
+      );
       canvas.canvasElements = mergedElements;
       canvas.updatedAt = new Date();
       canvas.lastUpdatedBy = socket.user.email;

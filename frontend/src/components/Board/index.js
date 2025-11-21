@@ -18,6 +18,7 @@ function Board({ canvasId, userEmail, initialElements = [], socket }) {
   const lastStreamTimeRef = useRef(0);
   const elementsRef = useRef(initialElements);
   const toolActionTypeRef = useRef(TOOL_ACTION_TYPES.NONE);
+  const removedElementIdsRef = useRef(new Set());
   
   const {
     elements,
@@ -67,7 +68,19 @@ function Board({ canvasId, userEmail, initialElements = [], socket }) {
   }, [undo, redo]);
 
   useEffect(() => {
-    elementsRef.current = elements;
+    const previousElements = elementsRef.current || [];
+    const nextElements = elements || [];
+    const nextIds = new Set(nextElements.map((el) => el?.id).filter(Boolean));
+
+    if (toolActionTypeRef.current === TOOL_ACTION_TYPES.ERASING) {
+      previousElements.forEach((element) => {
+        if (element?.id && !nextIds.has(element.id)) {
+          removedElementIdsRef.current.add(element.id);
+        }
+      });
+    }
+
+    elementsRef.current = nextElements;
   }, [elements]);
 
   useEffect(() => {
@@ -93,6 +106,19 @@ function Board({ canvasId, userEmail, initialElements = [], socket }) {
   );
 
   // Debounced save function to prevent rapid API calls
+  const buildRemovalEntries = useCallback(() => {
+    return Array.from(removedElementIdsRef.current).map((id) => ({
+      id,
+      isDeleted: true,
+      updatedAt: Date.now(),
+    }));
+  }, []);
+
+  const clearRemovedElementIds = useCallback(() => {
+    removedElementIdsRef.current.clear();
+  }, []);
+
+  // Debounced save function to prevent rapid API calls
   const saveCanvas = useCallback(async () => {
     // Prevent multiple simultaneous saves
     if (isSavingRef.current) {
@@ -111,27 +137,34 @@ function Board({ canvasId, userEmail, initialElements = [], socket }) {
     lastSaveTimeRef.current = now;
 
     try {
-      const serializedElements = serializeElements(elements);
-      console.log(`Saving canvas ${canvasId} with ${elements.length} elements`);
+      const currentElements = elementsRef.current || [];
+      const serializedElements = serializeElements(currentElements);
+      const removalEntries = buildRemovalEntries();
+      const payloadElements = [...serializedElements, ...removalEntries];
+      const removalIds = removalEntries.map((entry) => entry.id);
+      console.log(`Saving canvas ${canvasId} with ${currentElements.length} elements`);
 
       if (socket) {
         console.log("Emitting canvas update to other users");
         socket.emit('updateCanvas', {
           canvasId,
-          canvasElements: serializedElements
+          canvasElements: payloadElements,
+          removedElementIds: removalIds,
         });
       }
 
       // Persist via REST as a fallback, but don't block real-time updates
-      updateCanvas(canvasId, userEmail, serializedElements).catch((error) => {
+      updateCanvas(canvasId, userEmail, payloadElements).catch((error) => {
         console.error("Failed to persist canvas via REST:", error);
       });
+
+      clearRemovedElementIds();
     } catch (error) {
       console.error("Failed to save canvas:", error);
     } finally {
       isSavingRef.current = false;
     }
-  }, [canvasId, userEmail, elements, socket, serializeElements]);
+  }, [canvasId, userEmail, socket, serializeElements, buildRemovalEntries, clearRemovedElementIds]);
 
   const emitStreamPayload = useCallback(
     (payload) => {
@@ -161,9 +194,11 @@ function Board({ canvasId, userEmail, initialElements = [], socket }) {
           : 'element');
 
       if (mode === 'snapshot') {
+        const removalIds = Array.from(removedElementIdsRef.current);
         emitStreamPayload({
           mode: 'snapshot',
           elements: serializeElements(elementsRef.current),
+          removedElementIds: removalIds,
         });
         return;
       }
@@ -185,7 +220,21 @@ function Board({ canvasId, userEmail, initialElements = [], socket }) {
   useEffect(() => {
     if (!socket) return;
 
+    const applyRemovals = (ids = [], timestamp) => {
+      if (!Array.isArray(ids) || ids.length === 0) return;
+      const removalEntries = ids.map((id) => ({
+        id,
+        isDeleted: true,
+        updatedAt: timestamp || Date.now(),
+      }));
+      mergeElements(removalEntries);
+    };
+
     const handleStream = (payload = {}) => {
+      if (Array.isArray(payload.removedElementIds) && payload.removedElementIds.length) {
+        applyRemovals(payload.removedElementIds, payload.timestamp);
+      }
+
       if (payload.mode === 'element' && payload.element) {
         mergeElements([payload.element]);
         return;
