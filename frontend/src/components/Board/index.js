@@ -7,12 +7,17 @@ import { updateCanvas } from "../../utils/api";
 import classes from "./index.module.css";
 import cx from "classnames";
 
+const MIN_SAVE_INTERVAL_MS = 250;
+const STREAM_INTERVAL_MS = 75;
+
 function Board({ canvasId, userEmail, initialElements = [], socket }) {
   const canvasRef = useRef();
   const textAreaRef = useRef();
   const isSavingRef = useRef(false);
   const lastSaveTimeRef = useRef(0);
-  const saveTimeoutRef = useRef(null);
+  const lastStreamTimeRef = useRef(0);
+  const elementsRef = useRef(initialElements);
+  const toolActionTypeRef = useRef(TOOL_ACTION_TYPES.NONE);
   
   const {
     elements,
@@ -24,6 +29,7 @@ function Board({ canvasId, userEmail, initialElements = [], socket }) {
     textAreaBlurHandler,
     undo,
     redo,
+    mergeElements,
   } = useContext(boardContext);
   const { toolboxState } = useContext(toolboxContext);
 
@@ -60,8 +66,34 @@ function Board({ canvasId, userEmail, initialElements = [], socket }) {
     };
   }, [undo, redo]);
 
+  useEffect(() => {
+    elementsRef.current = elements;
+  }, [elements]);
+
+  useEffect(() => {
+    toolActionTypeRef.current = toolActionType;
+  }, [toolActionType]);
+
+  const serializeElement = useCallback((element) => {
+    if (!element) return null;
+    const { path, roughEle, ...rest } = element;
+    if (Array.isArray(rest.points)) {
+      rest.points = rest.points.map((point) => ({ ...point }));
+    }
+    return { ...rest };
+  }, []);
+
+  const serializeElements = useCallback(
+    (currentElements = elementsRef.current) => {
+      return currentElements
+        .map((element) => serializeElement(element))
+        .filter(Boolean);
+    },
+    [serializeElement]
+  );
+
   // Debounced save function to prevent rapid API calls
-  const saveCanvas = useCallback(async (skipWebSocket = false) => {
+  const saveCanvas = useCallback(async () => {
     // Prevent multiple simultaneous saves
     if (isSavingRef.current) {
       console.log("Save already in progress, skipping...");
@@ -70,7 +102,7 @@ function Board({ canvasId, userEmail, initialElements = [], socket }) {
 
     // Debounce: don't save more than once per second
     const now = Date.now();
-    if (now - lastSaveTimeRef.current < 1000) {
+    if (now - lastSaveTimeRef.current < MIN_SAVE_INTERVAL_MS) {
       console.log("Save debounced, too soon since last save");
       return;
     }
@@ -79,23 +111,104 @@ function Board({ canvasId, userEmail, initialElements = [], socket }) {
     lastSaveTimeRef.current = now;
 
     try {
+      const serializedElements = serializeElements(elements);
       console.log(`Saving canvas ${canvasId} with ${elements.length} elements`);
-      await updateCanvas(canvasId, userEmail, elements);
-      
-      // Only emit to WebSocket if this is a local change (not from incoming WebSocket update)
-      if (!skipWebSocket && socket) {
+
+      if (socket) {
         console.log("Emitting canvas update to other users");
         socket.emit('updateCanvas', {
           canvasId,
-          canvasElements: elements
+          canvasElements: serializedElements
         });
       }
+
+      // Persist via REST as a fallback, but don't block real-time updates
+      updateCanvas(canvasId, userEmail, serializedElements).catch((error) => {
+        console.error("Failed to persist canvas via REST:", error);
+      });
     } catch (error) {
       console.error("Failed to save canvas:", error);
     } finally {
       isSavingRef.current = false;
     }
-  }, [canvasId, userEmail, elements, socket]);
+  }, [canvasId, userEmail, elements, socket, serializeElements]);
+
+  const emitStreamPayload = useCallback(
+    (payload) => {
+      if (!socket) return;
+      const now = Date.now();
+
+      if (now - lastStreamTimeRef.current < STREAM_INTERVAL_MS) {
+        return;
+      }
+      lastStreamTimeRef.current = now;
+
+      socket.emit('streamCanvas', {
+        canvasId,
+        timestamp: now,
+        ...payload,
+      });
+    },
+    [socket, canvasId]
+  );
+
+  const streamActiveElement = useCallback(
+    (modeOverride) => {
+      const mode =
+        modeOverride ||
+        (toolActionTypeRef.current === TOOL_ACTION_TYPES.ERASING
+          ? 'snapshot'
+          : 'element');
+
+      if (mode === 'snapshot') {
+        emitStreamPayload({
+          mode: 'snapshot',
+          elements: serializeElements(elementsRef.current),
+        });
+        return;
+      }
+
+      const activeElement =
+        elementsRef.current[elementsRef.current.length - 1];
+      const serialized = serializeElement(activeElement);
+      if (!serialized) return;
+
+      emitStreamPayload({
+        mode: 'element',
+        element: serialized,
+      });
+    },
+    [emitStreamPayload, serializeElements, serializeElement]
+  );
+
+  // Listen for streaming updates from other collaborators
+  useEffect(() => {
+    if (!socket) return;
+
+    const handleStream = (payload = {}) => {
+      if (payload.mode === 'element' && payload.element) {
+        mergeElements([payload.element]);
+        return;
+      }
+
+      const snapshot = payload.canvasElements || payload.elements;
+      if (Array.isArray(snapshot)) {
+        mergeElements(snapshot);
+      }
+    };
+
+    const handleCanvasUpdated = ({ canvasElements }) => {
+      mergeElements(canvasElements || [], { resetHistory: true });
+    };
+
+    socket.on('canvasStream', handleStream);
+    socket.on('canvasUpdated', handleCanvasUpdated);
+
+    return () => {
+      socket.off('canvasStream', handleStream);
+      socket.off('canvasUpdated', handleCanvasUpdated);
+    };
+  }, [socket, mergeElements]);
 
   // Handle mouse up - save with debounce
   const handleMouseUp = useCallback(() => {
@@ -103,26 +216,9 @@ function Board({ canvasId, userEmail, initialElements = [], socket }) {
     
     if (toolActionType === TOOL_ACTION_TYPES.DRAWING || 
         toolActionType === TOOL_ACTION_TYPES.ERASING) {
-      // Clear any pending save timeout
-      if (saveTimeoutRef.current) {
-        clearTimeout(saveTimeoutRef.current);
-      }
-      
-      // Schedule save after 500ms of inactivity
-      saveTimeoutRef.current = setTimeout(() => {
-        saveCanvas();
-      }, 500);
+      saveCanvas();
     }
   }, [boardMouseUpHandler, toolActionType, saveCanvas]);
-
-  // Cleanup timeout on unmount
-  useEffect(() => {
-    return () => {
-      if (saveTimeoutRef.current) {
-        clearTimeout(saveTimeoutRef.current);
-      }
-    };
-  }, []);
 
   useLayoutEffect(() => {
     const canvas = canvasRef.current;
@@ -186,6 +282,17 @@ function Board({ canvasId, userEmail, initialElements = [], socket }) {
 
   const handleMouseMove = (event) => {
     boardMouseMoveHandler(event);
+
+    if (
+      toolActionTypeRef.current === TOOL_ACTION_TYPES.DRAWING ||
+      toolActionTypeRef.current === TOOL_ACTION_TYPES.ERASING
+    ) {
+      streamActiveElement(
+        toolActionTypeRef.current === TOOL_ACTION_TYPES.ERASING
+          ? 'snapshot'
+          : 'element'
+      );
+    }
   };
 
   const handleTextBlur = (text) => {

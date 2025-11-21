@@ -16,6 +16,60 @@ const logger = require('./logger');
 const app = express();
 const server = http.createServer(app);
 
+const normalizeTimestamp = (value) => {
+  if (!value) return 0;
+  const date = value instanceof Date ? value : new Date(value);
+  const time = date.getTime();
+  return Number.isNaN(time) ? 0 : time;
+};
+
+const mergeCanvasElements = (existing = [], incoming = []) => {
+  const map = new Map();
+
+  existing.forEach((element) => {
+    if (element?.id) {
+      map.set(element.id, element);
+    }
+  });
+
+  incoming.forEach((element) => {
+    if (!element || !element.id) {
+      return;
+    }
+
+    if (element.isDeleted) {
+      map.delete(element.id);
+      return;
+    }
+
+    const current = map.get(element.id);
+    if (!current) {
+      map.set(element.id, element);
+      return;
+    }
+
+    const currentUpdatedAt = normalizeTimestamp(current.updatedAt || current.createdAt);
+    const incomingUpdatedAt = normalizeTimestamp(element.updatedAt || element.createdAt);
+
+    if (incomingUpdatedAt >= currentUpdatedAt) {
+      map.set(element.id, {
+        ...current,
+        ...element,
+        updatedAt: incomingUpdatedAt ? new Date(incomingUpdatedAt) : new Date(),
+      });
+    }
+  });
+
+  return Array.from(map.values()).sort((a, b) => {
+    const aCreated = normalizeTimestamp(a.createdAt);
+    const bCreated = normalizeTimestamp(b.createdAt);
+    if (aCreated === bCreated) {
+      return (a.id || "").localeCompare(b.id || "");
+    }
+    return aCreated - bCreated;
+  });
+};
+
 // Allowed origins for CORS
 const allowedOrigins = [
   'https://sketchspace.onrender.com',
@@ -104,8 +158,14 @@ io.on('connection', (socket) => {
   logger.info(`Client connected: ${socket.id} | User: ${socket.user.email}`);
 
   // Join canvas room
-  socket.on('joinCanvas', async (canvasId) => {
+  socket.on('joinCanvas', async (payload) => {
     try {
+      const canvasId = typeof payload === 'string' ? payload : payload?.canvasId;
+
+      if (!canvasId) {
+        throw new Error('Canvas ID is required to join');
+      }
+
       // FIXED: Use correct field names from Canvas model
       const canvas = await Canvas.findOne({
         _id: canvasId,
@@ -136,7 +196,8 @@ io.on('connection', (socket) => {
 
       socket.to(canvasId).emit('userJoined', {
         userId: socket.id,
-        userEmail: socket.user.email
+        userEmail: socket.user.email,
+        canvasId
       });
     } catch (error) {
       logger.error(`Canvas join error: ${error.message}`);
@@ -159,7 +220,8 @@ io.on('connection', (socket) => {
         throw new Error('Canvas not found or access denied');
       }
   
-      canvas.canvasElements = canvasElements;
+      const mergedElements = mergeCanvasElements(canvas.canvasElements || [], canvasElements || []);
+      canvas.canvasElements = mergedElements;
       canvas.updatedAt = new Date();
       canvas.lastUpdatedBy = socket.user.email;
   
@@ -169,7 +231,8 @@ io.on('connection', (socket) => {
       io.to(canvasId).emit('canvasUpdated', {
         canvasElements: updatedCanvas.canvasElements,
         updatedBy: socket.user.email,
-        timestamp: updatedCanvas.updatedAt
+        timestamp: updatedCanvas.updatedAt,
+        version: normalizeTimestamp(updatedCanvas.updatedAt)
       });
 
       logger.info(`Canvas ${canvasId} updated by ${socket.user.email}`);
@@ -179,12 +242,44 @@ io.on('connection', (socket) => {
     }
   });
 
+  // Real-time streaming updates (no persistence)
+  socket.on('streamCanvas', ({ canvasId, element, elements, mode = 'element', timestamp, removedElementIds = [] }) => {
+    try {
+      if (!canvasId) {
+        throw new Error('Canvas ID is required for streaming');
+      }
+      if (!socket.rooms.has(canvasId)) {
+        throw new Error('User has not joined this canvas');
+      }
+
+      if (mode === 'snapshot' && !Array.isArray(elements)) {
+        throw new Error('Snapshot mode requires an elements array');
+      }
+
+      if (mode === 'element' && !element) {
+        throw new Error('Element mode requires a single element payload');
+      }
+
+      socket.to(canvasId).emit('canvasStream', {
+        mode,
+        element,
+        canvasElements: elements,
+        removedElementIds,
+        updatedBy: socket.user.email,
+        timestamp: timestamp || new Date(),
+      });
+    } catch (error) {
+      logger.error(`Canvas stream error: ${error.message}`);
+    }
+  });
+
   // Handle user leaving canvas room
   socket.on('leaveCanvas', (canvasId) => {
     socket.leave(canvasId);
     socket.to(canvasId).emit('userLeft', {
       userId: socket.id,
-      userEmail: socket.user.email
+      userEmail: socket.user.email,
+      canvasId
     });
     logger.info(`User ${socket.user.email} left canvas ${canvasId}`);
   });

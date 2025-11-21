@@ -11,9 +11,14 @@ export const createElement = (
   y1,
   x2,
   y2,
-  { type, stroke, fill, size }
+  { type, stroke, fill, size, createdAt }
 ) => {
-  const uniqueId = id !== undefined ? String(id) : `${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
+  const timestamp = Date.now();
+  const uniqueId =
+    id !== undefined
+      ? String(id)
+      : `${timestamp}-${Math.random().toString(36).slice(2, 11)}`;
+
   const element = {
     id: uniqueId,
     x1,
@@ -24,6 +29,8 @@ export const createElement = (
     fill,
     stroke,
     size,
+    createdAt: createdAt ?? timestamp,
+    updatedAt: timestamp,
   };
   let options = {
     seed: parseInt(uniqueId.split("-")[0]) || Date.now(), // Use first part if splitable, else fallback to Date.now()
@@ -46,6 +53,8 @@ export const createElement = (
         path: new Path2D(getSvgPathFromStroke(getStroke([{ x: x1, y: y1 }]))),
         type,
         stroke,
+        createdAt: createdAt ?? timestamp,
+        updatedAt: timestamp,
       };
       return brushElement;
     }
@@ -79,19 +88,21 @@ export const createElement = (
       ];
       element.roughEle = gen.linearPath(points, options);
       return element;
-      case TOOL_ITEMS.TEXT:
-        return {
-          id: uniqueId,
-          x1,
-          y1,
-          x2,
-          y2,
-          type,
-          text: "",  // Ensure text property is always present
-          stroke: stroke || "#000000",  // Default stroke
-          size: size || 20,  // Default size
-          fill: fill || "transparent"  // Default fill
-        };
+    case TOOL_ITEMS.TEXT:
+      return {
+        id: uniqueId,
+        x1,
+        y1,
+        x2,
+        y2,
+        type,
+        text: "", // Ensure text property is always present
+        stroke: stroke || "#000000", // Default stroke
+        size: size || 20, // Default size
+        fill: fill || "transparent", // Default fill
+        createdAt: createdAt ?? timestamp,
+        updatedAt: timestamp,
+      };
     default:
       throw new Error("Type not recognized");
   }

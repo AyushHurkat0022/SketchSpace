@@ -27,6 +27,7 @@ export const BOARD_ACTIONS = {
   UNDO: "UNDO",
   REDO: "REDO",
   SET_ELEMENTS: "SET_ELEMENTS",
+  MERGE_ELEMENTS: "MERGE_ELEMENTS",
 };
 
 export const COLORS = {

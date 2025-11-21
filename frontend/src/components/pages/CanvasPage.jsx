@@ -19,6 +19,7 @@ const CanvasPage = () => {
   const [isSharePopupOpen, setIsSharePopupOpen] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const socketRef = useRef(null);
+  const [socketInstance, setSocketInstance] = useState(null);
   const API_URL = process.env.REACT_APP_API_URL || "http://localhost:3030";
 
   // Prevent scrolling on the page
@@ -102,14 +103,12 @@ const CanvasPage = () => {
     socketRef.current = io(API_URL, {
       auth: { token: localStorage.getItem("token") },
     });
+    setSocketInstance(socketRef.current);
 
     socketRef.current.on("connect", () => {
       console.log(`Connected to WebSocket server with socket ID: ${socketRef.current.id}`);
       console.log(`Joining canvas ${canvasid} as user ${userEmail}`);
-      socketRef.current.emit("joinCanvas", {
-        canvasId: canvasid,
-        userEmail: userEmail,
-      });
+      socketRef.current.emit("joinCanvas", canvasid);
     });
 
     socketRef.current.on("disconnect", (reason) => {
@@ -134,7 +133,7 @@ const CanvasPage = () => {
       console.log(`User ${data.userEmail} joined the canvas ${data.canvasId}`);
     });
 
-    socketRef.current.on("user left", (data) => {
+    socketRef.current.on("userLeft", (data) => {
       console.log(`User ${data.userEmail} left the canvas ${data.canvasId}`);
     });
 
@@ -149,7 +148,7 @@ const CanvasPage = () => {
       socketRef.current.off("connect_error");
       socketRef.current.off("canvasUpdated");
       socketRef.current.off("userJoined");
-      socketRef.current.off("user left");
+      socketRef.current.off("userLeft");
       socketRef.current.off("error");
     };
   }, [canvasid, userEmail, API_URL]);
@@ -169,6 +168,7 @@ const CanvasPage = () => {
       console.log("Cleaning up WebSocket connection on component unmount");
       if (socketRef.current) {
         socketRef.current.disconnect();
+        setSocketInstance(null);
       }
     };
   }, [userEmail, fetchCanvas, setupWebSocket]);
@@ -336,7 +336,7 @@ const CanvasPage = () => {
               canvasId={canvasid}
               userEmail={userEmail}
               initialElements={canvasData?.canvasElements || []}
-              socket={socketRef.current}
+              socket={socketInstance}
             />
           ) : (
             <div className="flex items-center justify-center h-full">

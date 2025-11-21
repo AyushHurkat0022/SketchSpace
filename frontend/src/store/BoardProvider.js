@@ -9,6 +9,139 @@ import {
 } from "../utils/element";
 import getStroke from "perfect-freehand";
 
+const normalizeTimestamp = (value) => {
+  if (!value) return 0;
+  if (value instanceof Date) {
+    return value.getTime();
+  }
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? 0 : parsed.getTime();
+};
+
+const hydrateElement = (element) => {
+  if (!element) return null;
+
+  const elementCreatedAt = element.createdAt || Date.now();
+  const elementUpdatedAt = element.updatedAt || elementCreatedAt;
+
+  if (element.type === TOOL_ITEMS.BRUSH) {
+    const points = element.points || [];
+    const strokePoints = getStroke(points);
+    const path = new Path2D(getSvgPathFromStroke(strokePoints));
+    return {
+      ...element,
+      points,
+      path,
+      createdAt: elementCreatedAt,
+      updatedAt: elementUpdatedAt,
+    };
+  }
+
+  if (
+    element.type === TOOL_ITEMS.LINE ||
+    element.type === TOOL_ITEMS.RECTANGLE ||
+    element.type === TOOL_ITEMS.CIRCLE ||
+    element.type === TOOL_ITEMS.ARROW
+  ) {
+    const hydrated = createElement(
+      element.id,
+      element.x1,
+      element.y1,
+      element.x2,
+      element.y2,
+      {
+        type: element.type,
+        stroke: element.stroke,
+        fill: element.fill,
+        size: element.size,
+        createdAt: elementCreatedAt,
+      }
+    );
+
+    return {
+      ...hydrated,
+      ...element,
+      createdAt: elementCreatedAt,
+      updatedAt: elementUpdatedAt,
+      roughEle: hydrated.roughEle,
+    };
+  }
+
+  if (element.type === TOOL_ITEMS.TEXT) {
+    return {
+      ...element,
+      text: element.text || "",
+      stroke: element.stroke || "#000000",
+      size: element.size || 20,
+      fill: element.fill || "transparent",
+      createdAt: elementCreatedAt,
+      updatedAt: elementUpdatedAt,
+    };
+  }
+
+  return {
+    ...element,
+    createdAt: elementCreatedAt,
+    updatedAt: elementUpdatedAt,
+  };
+};
+
+const hydrateElements = (elements = []) =>
+  elements
+    .map((element) => hydrateElement(element))
+    .filter((element) => element && element.id);
+
+const mergeElementLists = (current = [], incoming = []) => {
+  const map = new Map();
+
+  current.forEach((element) => {
+    if (element?.id) {
+      map.set(element.id, element);
+    }
+  });
+
+  incoming.forEach((element) => {
+    if (!element || !element.id) {
+      return;
+    }
+
+    if (element.isDeleted) {
+      map.delete(element.id);
+      return;
+    }
+
+    const existing = map.get(element.id);
+    if (!existing) {
+      map.set(element.id, element);
+      return;
+    }
+
+    const existingUpdatedAt =
+      normalizeTimestamp(existing.updatedAt) ||
+      normalizeTimestamp(existing.createdAt);
+    const incomingUpdatedAt =
+      normalizeTimestamp(element.updatedAt) ||
+      normalizeTimestamp(element.createdAt);
+
+    if (incomingUpdatedAt >= existingUpdatedAt) {
+      map.set(element.id, {
+        ...existing,
+        ...element,
+        updatedAt: element.updatedAt || existing.updatedAt,
+      });
+    }
+  });
+
+  return Array.from(map.values()).sort((a, b) => {
+    const aCreated = normalizeTimestamp(a.createdAt);
+    const bCreated = normalizeTimestamp(b.createdAt);
+    if (aCreated === bCreated) {
+      return (a.id || "").localeCompare(b.id || "");
+    }
+    return aCreated - bCreated;
+  });
+};
+
 const boardReducer = (state, action) => {
   switch (action.type) {
     case BOARD_ACTIONS.CHANGE_TOOL: {
@@ -25,7 +158,7 @@ const boardReducer = (state, action) => {
     case BOARD_ACTIONS.DRAW_DOWN: {
       const { clientX, clientY, stroke, fill, size } = action.payload;
       const newElement = createElement(
-        state.elements.length,
+        undefined,
         clientX,
         clientY,
         clientX,
@@ -46,18 +179,23 @@ const boardReducer = (state, action) => {
       const { clientX, clientY } = action.payload;
       const newElements = [...state.elements];
       const index = state.elements.length - 1;
-      const { type } = newElements[index];
+      const currentElement = newElements[index];
+      if (!currentElement) {
+        return state;
+      }
+      const { type } = currentElement;
       switch (type) {
         case TOOL_ITEMS.LINE:
         case TOOL_ITEMS.RECTANGLE:
         case TOOL_ITEMS.CIRCLE:
         case TOOL_ITEMS.ARROW:
-          const { x1, y1, stroke, fill, size } = newElements[index];
-          const newElement = createElement(index, x1, y1, clientX, clientY, {
+          const { x1, y1, stroke, fill, size, createdAt, id } = currentElement;
+          const newElement = createElement(id, x1, y1, clientX, clientY, {
             type: state.activeToolItem,
             stroke,
             fill,
             size,
+            createdAt,
           });
           newElements[index] = newElement;
           return {
@@ -72,6 +210,7 @@ const boardReducer = (state, action) => {
           newElements[index].path = new Path2D(
             getSvgPathFromStroke(getStroke(newElements[index].points))
           );
+          newElements[index].updatedAt = Date.now();
           return {
             ...state,
             elements: newElements,
@@ -120,6 +259,7 @@ const boardReducer = (state, action) => {
       const index = state.elements.length - 1;
       const newElements = [...state.elements];
       newElements[index].text = action.payload.text;
+      newElements[index].updatedAt = Date.now();
       
       // Remove any history after current index
       const newHistory = state.history.slice(0, state.index + 1);
@@ -164,21 +304,26 @@ const boardReducer = (state, action) => {
       };
     }
     case BOARD_ACTIONS.SET_ELEMENTS: {
-      const processedElements = action.payload.elements.map((element) => {
-        if (element.type === TOOL_ITEMS.BRUSH) {
-          const path = new Path2D(
-            getSvgPathFromStroke(getStroke(element.points || []))
-          );
-          return { ...element, path };
-        }
-        return element;
-      });
-    
+      const { elements = [], resetHistory = true } = action.payload || {};
+      const processedElements = hydrateElements(elements);
+
       return {
         ...state,
         elements: processedElements,
-        history: [processedElements],
-        index: 0,
+        history: resetHistory ? [processedElements] : state.history,
+        index: resetHistory ? 0 : state.index,
+      };
+    }
+    case BOARD_ACTIONS.MERGE_ELEMENTS: {
+      const incoming = hydrateElements(action.payload?.elements || []);
+      const mergedElements = mergeElementLists(state.elements, incoming);
+      const shouldResetHistory = action.payload?.resetHistory || false;
+
+      return {
+        ...state,
+        elements: mergedElements,
+        history: shouldResetHistory ? [mergedElements] : state.history,
+        index: shouldResetHistory ? 0 : state.index,
       };
     }
     default:
@@ -209,7 +354,17 @@ const BoardProvider = ({ children, initialElements = [] }) => {
   const setElements = (elements) => {
     dispatchBoardAction({
       type: BOARD_ACTIONS.SET_ELEMENTS,
-      payload: { elements },
+      payload: { elements, resetHistory: false },
+    });
+  };
+
+  const mergeElements = (elements, options = {}) => {
+    dispatchBoardAction({
+      type: BOARD_ACTIONS.MERGE_ELEMENTS,
+      payload: {
+        elements,
+        resetHistory: options.resetHistory ?? false,
+      },
     });
   };
 
@@ -323,6 +478,7 @@ const BoardProvider = ({ children, initialElements = [] }) => {
     undo: boardUndoHandler,
     redo: boardRedoHandler,
     setElements,
+    mergeElements,
   };
 
   return (
