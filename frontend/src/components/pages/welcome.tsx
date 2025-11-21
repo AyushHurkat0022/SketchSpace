@@ -116,11 +116,6 @@ const WelcomePage: React.FC = () => {
     return (
         <div className="min-h-screen p-8 rounded-lg shadow-lg text-center max-w-full flex flex-col justify-center items-center bg-starry relative">
 
-            {/* Beta Label */}
-            <div className="absolute top-4 right-4 text-xs text-gray-500 font-semibold z-50">
-                Beta
-            </div>
-
             {/* Header */}
             <div className="header absolute top-0 left-0 right-0 p-8 text-center z-20 mb-4">
                 <h1 className="text-yellow-600 text-4xl font-bold mb-2 lg:text-5xl drop-shadow-[0px_0px_32px_rgba(224,174,42,1.0)]">
@@ -144,7 +139,7 @@ const WelcomePage: React.FC = () => {
 
                 {/* Note Below Button */}
                 <p className="text-sm text-gray-600 mt-2">
-                    The canvas and sharing features are live and ready to use. Real-time collaboration is coming soon. Enjoy exploring the canvas!
+                    v1.1.0
                 </p>
             </div>
         </div>
