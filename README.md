@@ -13,7 +13,6 @@
 [![perfect--freehand](https://img.shields.io/badge/perfect--freehand-1.2.2-FF6B6B?style=for-the-badge)](https://github.com/steveruizok/perfect-freehand)
 [![rough.js](https://img.shields.io/badge/rough.js-4.6.6-4ECDC4?style=for-the-badge)](https://roughjs.com)
 [![lucide--react](https://img.shields.io/badge/lucide--react-0.483.0-000000?style=for-the-badge)](https://lucide.dev)
-[![Zustand](https://img.shields.io/badge/Zustand-5.0.0-rc.2-FF6B6B?style=for-the-badge)](https://zustand-demo.pmnd.rs/)
 
 **SketchSpace** — A real-time collaborative whiteboard & sketching app. Draw together on an infinite canvas with smooth, natural strokes, live cursors, and instant sync. Perfect for brainstorming, teaching, design sprints, or fun doodle sessions.
 
